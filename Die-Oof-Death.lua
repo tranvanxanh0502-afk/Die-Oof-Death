@@ -472,7 +472,98 @@ mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
     end
 end)
 
+-- ============================
+-- Implement Fast Artful (HoldInAir)
+-- ============================
+tabGameplay:CreateToggle({
+    Name = "Implement Fast Artful",
+    CurrentValue = false,
+    Callback = function(Value)
+        getgenv().ImplementEnabled = Value
+        if Value then
+            pcall(function() HoldImpl_CheckAttributes() end)
+        end
+    end,
+})
+
+do
+    local player = lp
+    local character = player.Character or player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+
+    local function getKillerFolder()
+        local ga = Workspace:FindFirstChild("GameAssets")
+        if not ga then return nil end
+        local teams = ga:FindFirstChild("Teams")
+        if not teams then return nil end
+        return teams:FindFirstChild("Killer")
+    end
+
+    local function HoldImpl_isKiller()
+        local kf = getKillerFolder()
+        if not kf then return false end
+        return kf:FindFirstChild(player.Name) ~= nil
+    end
+
+    local function HoldImpl_holdInAir(humanoidRootPart, duration, offsetY)
+        task.spawn(function()
+            if not humanoidRootPart or not humanoidRootPart.Parent then return end
+            local bp = Instance.new("BodyPosition")
+            bp.Position = humanoidRootPart.Position + Vector3.new(0, offsetY, 0)
+            bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bp.P = 100000
+            bp.D = 1000
+            bp.Parent = humanoidRootPart
+
+            task.wait(duration)
+            if bp and bp.Parent then
+                bp:Destroy()
+            end
+        end)
+    end
+
+    function HoldImpl_CheckAttributes()
+        if not getgenv().ImplementEnabled then return end
+        if not HoldImpl_isKiller() then return end
+        if not character or not hrp then return end
+
+        local killerName = character:GetAttribute("KillerName")
+        local implementCooldown = character:GetAttribute("ImplementCooldown")
+        if killerName == "Artful" and implementCooldown == true then
+            HoldImpl_holdInAir(hrp, 2, 2.2)
+        end
+    end
+
+    character.AttributeChanged:Connect(function(attr)
+        if attr == "KillerName" or attr == "ImplementCooldown" then
+            HoldImpl_CheckAttributes()
+        end
+    end)
+
+    player.CharacterAdded:Connect(function(newChar)
+        character = newChar
+        hrp = character:WaitForChild("HumanoidRootPart")
+        HoldImpl_CheckAttributes()
+    end)
+
+    local kf = getKillerFolder()
+    if kf then
+        kf.ChildAdded:Connect(function(child)
+            if child.Name == player.Name then
+                HoldImpl_CheckAttributes()
+            end
+        end)
+        kf.ChildRemoved:Connect(function(child)
+            if child.Name == player.Name then
+                HoldImpl_CheckAttributes()
+            end
+        end)
+    end
+end
+
+-- ============================
 -- Settings tab
+-- ============================
 local tabSettings = Window:CreateTab("Settings", 4483362458)
 
 local instantPPEnabled = true
