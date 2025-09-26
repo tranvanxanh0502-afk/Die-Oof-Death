@@ -473,16 +473,13 @@ mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
 end)
 
 -- ============================
--- Implement Fast Artful (HoldInAir)
+-- Implement Fast Artful (HoldInAir) - Sửa lỗi không hoạt động
 -- ============================
 tabGameplay:CreateToggle({
     Name = "Implement Fast Artful",
     CurrentValue = false,
     Callback = function(Value)
         getgenv().ImplementEnabled = Value
-        if Value then
-            pcall(function() HoldImpl_CheckAttributes() end)
-        end
     end,
 })
 
@@ -522,43 +519,26 @@ do
         end)
     end
 
-    function HoldImpl_CheckAttributes()
+    -- Heartbeat loop quét liên tục
+    mainConns.implHB = RunService.Heartbeat:Connect(function()
+        if unloaded then return end
         if not getgenv().ImplementEnabled then return end
         if not HoldImpl_isKiller() then return end
         if not character or not hrp then return end
 
         local killerName = character:GetAttribute("KillerName")
         local implementCooldown = character:GetAttribute("ImplementCooldown")
-        if killerName == "Artful" and implementCooldown == true then
-            HoldImpl_holdInAir(hrp, 2, 2.2)
-        end
-    end
 
-    character.AttributeChanged:Connect(function(attr)
-        if attr == "KillerName" or attr == "ImplementCooldown" then
-            HoldImpl_CheckAttributes()
+        -- Nếu implementCooldown là boolean thì đổi == true
+        if killerName == "Artful" and implementCooldown and implementCooldown > 0 then
+            HoldImpl_holdInAir(hrp, 2, 2.2)
         end
     end)
 
     player.CharacterAdded:Connect(function(newChar)
         character = newChar
         hrp = character:WaitForChild("HumanoidRootPart")
-        HoldImpl_CheckAttributes()
     end)
-
-    local kf = getKillerFolder()
-    if kf then
-        kf.ChildAdded:Connect(function(child)
-            if child.Name == player.Name then
-                HoldImpl_CheckAttributes()
-            end
-        end)
-        kf.ChildRemoved:Connect(function(child)
-            if child.Name == player.Name then
-                HoldImpl_CheckAttributes()
-            end
-        end)
-    end
 end
 
 -- ============================
