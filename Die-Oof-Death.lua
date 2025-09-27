@@ -371,7 +371,7 @@ for _, skillName in ipairs(skillList) do
         if enabled then createSkillButton(skillName) end
     end})
 end
--- PART 3: Gameplay Settings + Settings
+-- PART 3: Gameplay Settings + Settings (Rayfield + Implement Fast Artful)
 -- expects Window, RunService, lp, Workspace, Storage, connections, mainConns, unloaded exist from Part1
 local RunService = RunService or game:GetService("RunService")
 local lp = lp or game:GetService("Players").LocalPlayer
@@ -473,73 +473,82 @@ mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
 end)
 
 -- ============================
--- Implement Fast Artful (HoldInAir) - Sửa lỗi không hoạt động
+-- Implement Fast Artful (HoldInAir) tích hợp Rayfield GUI
 -- ============================
-tabGameplay:CreateToggle({
-    Name = "Implement Fast Artful",
-    CurrentValue = false,
-    Callback = function(Value)
-        getgenv().ImplementEnabled = Value
-    end,
-})
 
-do
-    local player = lp
-    local character = player.Character or player.CharacterAdded:Wait()
-    local hrp = character:WaitForChild("HumanoidRootPart")
+getgenv().ImplementEnabled = false
+local canTrigger = true
 
-    local function getKillerFolder()
-        local ga = Workspace:FindFirstChild("GameAssets")
-        if not ga then return nil end
-        local teams = ga:FindFirstChild("Teams")
-        if not teams then return nil end
-        return teams:FindFirstChild("Killer")
-    end
+local function getKillerFolder()
+    local ga = Workspace:FindFirstChild("GameAssets")
+    if not ga then return nil end
+    local teams = ga:FindFirstChild("Teams")
+    if not teams then return nil end
+    return teams:FindFirstChild("Killer")
+end
 
-    local function HoldImpl_isKiller()
-        local kf = getKillerFolder()
-        if not kf then return false end
-        return kf:FindFirstChild(player.Name) ~= nil
-    end
+local function HoldImpl_isKiller()
+    local kf = getKillerFolder()
+    if not kf then return false end
+    return kf:FindFirstChild(lp.Name) ~= nil
+end
 
-    local function HoldImpl_holdInAir(humanoidRootPart, duration, offsetY)
-        task.spawn(function()
-            if not humanoidRootPart or not humanoidRootPart.Parent then return end
-            local bp = Instance.new("BodyPosition")
-            bp.Position = humanoidRootPart.Position + Vector3.new(0, offsetY, 0)
-            bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bp.P = 100000
-            bp.D = 1000
-            bp.Parent = humanoidRootPart
+local function HoldImpl_holdInAir(duration, offsetY)
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not hrp.Parent then return end
+    local bp = Instance.new("BodyPosition")
+    bp.Position = hrp.Position + Vector3.new(0, offsetY, 0)
+    bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bp.P = 100000
+    bp.D = 1000
+    bp.Parent = hrp
 
-            task.wait(duration)
-            if bp and bp.Parent then
-                bp:Destroy()
-            end
-        end)
-    end
-
-    -- Heartbeat loop quét liên tục
-    mainConns.implHB = RunService.Heartbeat:Connect(function()
-        if unloaded then return end
-        if not getgenv().ImplementEnabled then return end
-        if not HoldImpl_isKiller() then return end
-        if not character or not hrp then return end
-
-        local killerName = character:GetAttribute("KillerName")
-        local implementCooldown = character:GetAttribute("ImplementCooldown")
-
-        -- Nếu implementCooldown là boolean thì đổi == true
-        if killerName == "Artful" and implementCooldown and implementCooldown > 0 then
-            HoldImpl_holdInAir(hrp, 2, 2.2)
+    task.spawn(function()
+        task.wait(duration)
+        if bp and bp.Parent then
+            bp:Destroy()
         end
     end)
-
-    player.CharacterAdded:Connect(function(newChar)
-        character = newChar
-        hrp = character:WaitForChild("HumanoidRootPart")
-    end)
 end
+
+local function HoldImpl_CheckAttributes()
+    if not getgenv().ImplementEnabled then return end
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not char or not hrp then return end
+    if not HoldImpl_isKiller() then return end
+
+    local killerName = char:GetAttribute("KillerName")
+    local implementCooldown = char:GetAttribute("ImplementCooldown")
+
+    if killerName == "Artful" and canTrigger and (implementCooldown == true or (type(implementCooldown)=="number" and implementCooldown>0)) then
+        HoldImpl_holdInAir(2,2.2)
+        canTrigger = false
+    end
+
+    if implementCooldown == false or implementCooldown == 0 then
+        canTrigger = true
+    end
+end
+
+mainConns.implementHB = RunService.Heartbeat:Connect(HoldImpl_CheckAttributes)
+
+lp.CharacterAdded:Connect(function(newChar)
+    canTrigger = true
+end)
+
+tabGameplay:CreateToggle({
+    Name = "Implement Fast Artful",
+    CurrentValue = getgenv().ImplementEnabled,
+    Callback = function(Value)
+        getgenv().ImplementEnabled = Value
+        print("[Implement Fast Artful] Bật:", Value)
+        if Value then
+            HoldImpl_CheckAttributes()
+        end
+    end,
+})
 
 -- ============================
 -- Settings tab
@@ -580,7 +589,6 @@ tabSettings:CreateButton({
             pcall(function() Storage:ClearAllChildren() end)
         end
 
-        -- disconnect connections table (per-player)
         for plr, conns in pairs(connections) do
             if conns then
                 for k, conn in pairs(conns) do
@@ -592,7 +600,6 @@ tabSettings:CreateButton({
             connections[plr] = nil
         end
 
-        -- disconnect mainConns
         for k, conn in pairs(mainConns) do
             if conn and typeof(conn) == "RBXScriptConnection" then
                 pcall(function() conn:Disconnect() end)
