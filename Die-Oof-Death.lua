@@ -55,7 +55,7 @@ end
 -- Window is global on purpose so other parts can use it
 Window = Rayfield:CreateWindow({
     Name="HUB (Die of Death)",
-    LoadingTitle="Loading...",
+    LoadingTitle="Loading...TY @maxiedsu/gonnered",
     LoadingSubtitle="by cutotoite_10",
     ConfigurationSaving={Enabled=false}
 })
