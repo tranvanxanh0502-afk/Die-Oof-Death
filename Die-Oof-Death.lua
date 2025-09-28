@@ -326,7 +326,7 @@ local function createSkillButton(skillName)
     local btnFrame = Instance.new("Frame")
     btnFrame.Name = skillName.."_Btn"; btnFrame.Size=UDim2.new(0,cfg.size,0,cfg.size); btnFrame.Position=UDim2.new(0,cfg.pos[1],0,cfg.pos[2]); btnFrame.BackgroundTransparency=1; btnFrame.Parent=guiStorage
     local border=Instance.new("UIStroke"); border.Thickness=2; border.Color=Color3.fromRGB(239,239,239); border.Parent=btnFrame
-    local innerFrame=Instance.new("Frame"); innerFrame.Size=UDim2.new(1,0,1,0); innerFrame.BackgroundColor3=Color3.fromRGB(0,0,0); innerFrame.BackgroundTransparency=0.6; innerFrame.BorderSizePixel=0; innerFrame.Parent=btnFrame
+    local innerFrame=Instance.new("Frame"); innerFrame.Size=UDim2.new(1,0,1,0); innerFrame.BackgroundColor3=Color3.fromRGB(0,0,0); innerFrame.BackgroundTransparency=0.2; innerFrame.BorderSizePixel=0; innerFrame.Parent=btnFrame
     local icon=Instance.new("ImageLabel"); icon.Size=UDim2.new(0.9,0,0.9,0); icon.Position=UDim2.new(0.5,0,0.5,0); icon.AnchorPoint=Vector2.new(0.5,0.5); icon.BackgroundTransparency=1; icon.Image=skillData.Icon or ""; icon.ScaleType=Enum.ScaleType.Fit; icon.Parent=innerFrame
     local cooldownOverlay=Instance.new("Frame"); cooldownOverlay.Size=UDim2.new(1,0,1,0); cooldownOverlay.BackgroundColor3=Color3.fromRGB(0,0,0); cooldownOverlay.BackgroundTransparency=0.6; cooldownOverlay.BorderSizePixel=0; cooldownOverlay.Visible=false; cooldownOverlay.Parent=innerFrame
     local cdLabel=Instance.new("TextLabel"); cdLabel.Size=UDim2.new(1,0,1,0); cdLabel.BackgroundTransparency=1; cdLabel.TextColor3=Color3.fromRGB(255,255,255); cdLabel.TextScaled=true; cdLabel.Font=Enum.Font.GothamBold; cdLabel.Visible=false; cdLabel.Parent=cooldownOverlay
