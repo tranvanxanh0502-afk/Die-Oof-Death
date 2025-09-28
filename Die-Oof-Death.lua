@@ -247,7 +247,8 @@ mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
             local teamName = plr.Character.Parent and plr.Character.Parent.Name
             if teamName == "Killer" then
                 local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
-                if dist <= blockDistance then doBlock(plr,dist) end-- PART 2: Skills & Selector
+                if dist <= blockDistance then doBlock(plr,dist) end
+-- PART 2: Skills & Selector
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
 local lp = lp or game:GetService("Players").LocalPlayer
