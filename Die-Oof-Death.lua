@@ -469,11 +469,11 @@ end
 
 -- Create toggles + sliders for each skill, default ON
 for _, skillName in ipairs(skillList) do
-    local enabled = true  -- mặc định bật
+    local enabled = false  -- mặc định bật
 
     tabSkills:CreateToggle({
         Name = "Enable "..skillName,
-        CurrentValue = true,  -- toggle mặc định bật
+        CurrentValue = false,  -- toggle mặc định bật
         Callback = function(v)
             enabled = v
             if v then
@@ -499,9 +499,6 @@ for _, skillName in ipairs(skillList) do
         end
     })
 
-    -- Tạo skill button ngay lập tức vì mặc định bật
-    createSkillButton(skillName)
-end
 -- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI)
 
 local RunService = game:GetService("RunService")
