@@ -371,22 +371,31 @@ for _, skillName in ipairs(skillList) do
         if enabled then createSkillButton(skillName) end
     end})
 end
--- ============================
--- PART 3: Gameplay Settings + Settings (Rayfield + Implement Fast Artful + AntiWalls)
--- expects Window, RunService, lp, Workspace, Storage, connections, mainConns, unloaded exist from Part1
-local RunService = RunService or game:GetService("RunService")
-local lp = lp or game:GetService("Players").LocalPlayer
-local Workspace = Workspace or game:GetService("Workspace")
-local CoreGui = CoreGui or game:GetService("CoreGui")
-local Storage = Storage or CoreGui:FindFirstChild("Highlight_Storage")
+-- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI)
 
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local lp = Players.LocalPlayer
+local Storage = CoreGui:FindFirstChild("Highlight_Storage")
+
+-- Tab GUI
 local tabGameplay = Window:CreateTab("Gameplay Settings", 4483362458)
 
--- WalkSpeedModifier lock
+-- ============================
+-- WalkSpeed Modifier Lock
+-- ============================
 local lockWSM = true
-tabGameplay:CreateToggle({Name="Lock WalkSpeedModifier", CurrentValue=lockWSM, Callback=function(v) lockWSM=v end})
+tabGameplay:CreateToggle({
+    Name="Lock WalkSpeedModifier",
+    CurrentValue=lockWSM,
+    Callback=function(v) lockWSM=v end
+})
 
--- Stamina controls
+-- ============================
+-- Stamina Controls
+-- ============================
 local keepStaminaEnabled = true
 local customStamina = 100
 local defaultStamina = (lp.Character or lp.CharacterAdded:Wait()):GetAttribute("MaxStamina") or 100
@@ -395,35 +404,32 @@ tabGameplay:CreateToggle({
     Name="Enable Custom MaxStamina",
     CurrentValue=keepStaminaEnabled,
     Callback=function(v)
-        keepStaminaEnabled = v
-        local ch = lp.Character
-        if not ch then return end
-        if not v then
-            ch:SetAttribute("MaxStamina", defaultStamina)
-        else
-            ch:SetAttribute("MaxStamina", customStamina)
+        keepStaminaEnabled=v
+        local ch=lp.Character
+        if ch then
+            ch:SetAttribute("MaxStamina", v and customStamina or defaultStamina)
         end
     end
 })
 
 tabGameplay:CreateInput({
-    Name="Custom MaxStamina (0 - 10000)",
+    Name="Custom MaxStamina (0-10000)",
     PlaceholderText="Nhập số...",
     RemoveTextAfterFocusLost=true,
     Callback=function(text)
         local num = tonumber(text)
-        if num and num >= 0 and num <= 10000 then
-            customStamina = num
-            local ch = lp.Character
-            if keepStaminaEnabled and ch then
-                ch:SetAttribute("MaxStamina", customStamina)
+        if num and num>=0 and num<=10000 then
+            customStamina=num
+            if keepStaminaEnabled and lp.Character then
+                lp.Character:SetAttribute("MaxStamina",customStamina)
             end
         else
-            warn("Giá trị không hợp lệ (0 - 10000)")
+            warn("Giá trị không hợp lệ (0-10000)")
         end
     end
 })
 
+-- Heartbeat loop WalkSpeed/Stamina
 mainConns.staminaHB = RunService.Heartbeat:Connect(function()
     if unloaded then return end
     local char = lp.Character
@@ -431,11 +437,11 @@ mainConns.staminaHB = RunService.Heartbeat:Connect(function()
     if not hum then return end
 
     if lockWSM then
-        for _, obj in pairs({hum, char, lp}) do
+        for _, obj in pairs({hum,char,lp}) do
             if obj and obj.GetAttributes then
-                for name, val in pairs(obj:GetAttributes()) do
+                for name,val in pairs(obj:GetAttributes()) do
                     if typeof(name)=="string" and name:lower():find("walkspeedmodifier") then
-                        if val <= 0 then obj:SetAttribute(name, 0) end
+                        if val<=0 then obj:SetAttribute(name,0) end
                     end
                 end
             end
@@ -443,29 +449,28 @@ mainConns.staminaHB = RunService.Heartbeat:Connect(function()
     end
 
     if keepStaminaEnabled and char then
-        if char:GetAttribute("MaxStamina") ~= customStamina then
-            char:SetAttribute("MaxStamina", customStamina)
+        if char:GetAttribute("MaxStamina")~=customStamina then
+            char:SetAttribute("MaxStamina",customStamina)
         end
     elseif char then
-        if char:GetAttribute("MaxStamina") ~= defaultStamina then
-            char:SetAttribute("MaxStamina", defaultStamina)
+        if char:GetAttribute("MaxStamina")~=defaultStamina then
+            char:SetAttribute("MaxStamina",defaultStamina)
         end
     end
 end)
 
+-- CharacterAdded WalkSpeed/Stamina
 mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
     local hum = char:WaitForChild("Humanoid")
-    if keepStaminaEnabled then
-        char:SetAttribute("MaxStamina", customStamina)
-    else
-        char:SetAttribute("MaxStamina", defaultStamina)
-    end
+    if keepStaminaEnabled then char:SetAttribute("MaxStamina",customStamina)
+    else char:SetAttribute("MaxStamina",defaultStamina) end
+
     if lockWSM then
-        for _, obj in pairs({hum, char, lp}) do
+        for _, obj in pairs({hum,char,lp}) do
             if obj and obj.GetAttributes then
-                for name, val in pairs(obj:GetAttributes()) do
+                for name,val in pairs(obj:GetAttributes()) do
                     if typeof(name)=="string" and name:lower():find("walkspeedmodifier") then
-                        if val <= 0 then obj:SetAttribute(name, 0) end
+                        if val<=0 then obj:SetAttribute(name,0) end
                     end
                 end
             end
@@ -474,40 +479,44 @@ mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
 end)
 
 -- ============================
--- AntiWalls feature
+-- AntiWalls
 -- ============================
-AntiWalls = false
-
+local AntiWalls = false
 tabGameplay:CreateToggle({
-    Name = "Anti-Artful Walls",
-    CurrentValue = AntiWalls,
-    Callback = function(Value)
-        AntiWalls = Value
+    Name="Anti-Artful Walls",
+    CurrentValue=AntiWalls,
+    Callback=function(v) AntiWalls=v end
+})
+
+local function HandleWallPart(part)
+    if part and part.Name=="HumanoidRootPart" and part.Anchored==true then
+        part.CanCollide=false
+        part.CanTouch=false
+        part.Transparency=0.5
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
         if AntiWalls then
-            for _, v in pairs(Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Other"):GetDescendants()) do
-                if v and v.Name == "HumanoidRootPart" and v.Anchored then
-                    v.CanCollide = false
-                    v.CanTouch = false
-                    v.Transparency = 0.5
-                end
+            local otherTeamFolder = Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Other")
+            for _, desc in pairs(otherTeamFolder:GetDescendants()) do
+                HandleWallPart(desc)
             end
         end
     end
-})
+end)
 
-Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Other").DescendantAdded:Connect(function(descendant)
-    if descendant and descendant.Name == "HumanoidRootPart" and descendant.Anchored and AntiWalls then
-        descendant.CanCollide = false
-        descendant.CanTouch = false
-        descendant.Transparency = 0.5
-    end
+Workspace.GameAssets.Teams.Other.DescendantAdded:Connect(function(desc)
+    if AntiWalls then HandleWallPart(desc) end
 end)
 
 -- ============================
--- Implement Fast Artful (HoldInAir) tích hợp Rayfield GUI
+-- Implement Fast Artful
 -- ============================
-getgenv().ImplementEnabled = false
-local canTrigger = true
+getgenv().ImplementEnabled=false
+local canTrigger=true
 
 local function getKillerFolder()
     local ga = Workspace:FindFirstChild("GameAssets")
@@ -520,25 +529,22 @@ end
 local function HoldImpl_isKiller()
     local kf = getKillerFolder()
     if not kf then return false end
-    return kf:FindFirstChild(lp.Name) ~= nil
+    return kf:FindFirstChild(lp.Name)~=nil
 end
 
-local function HoldImpl_holdInAir(duration, offsetY)
+local function HoldImpl_holdInAir(duration,offsetY)
     local char = lp.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp or not hrp.Parent then return end
     local bp = Instance.new("BodyPosition")
-    bp.Position = hrp.Position + Vector3.new(0, offsetY, 0)
-    bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bp.Position = hrp.Position + Vector3.new(0,offsetY,0)
+    bp.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
     bp.P = 100000
     bp.D = 1000
     bp.Parent = hrp
-
     task.spawn(function()
         task.wait(duration)
-        if bp and bp.Parent then
-            bp:Destroy()
-        end
+        if bp and bp.Parent then bp:Destroy() end
     end)
 end
 
@@ -552,30 +558,82 @@ local function HoldImpl_CheckAttributes()
     local killerName = char:GetAttribute("KillerName")
     local implementCooldown = char:GetAttribute("ImplementCooldown")
 
-    if killerName == "Artful" and canTrigger and (implementCooldown == true or (type(implementCooldown)=="number" and implementCooldown>0)) then
+    if killerName=="Artful" and canTrigger and (implementCooldown==true or (type(implementCooldown)=="number" and implementCooldown>0)) then
         HoldImpl_holdInAir(2,2.2)
-        canTrigger = false
+        canTrigger=false
     end
 
-    if implementCooldown == false or implementCooldown == 0 then
-        canTrigger = true
-    end
+    if implementCooldown==false or implementCooldown==0 then canTrigger=true end
 end
 
 mainConns.implementHB = RunService.Heartbeat:Connect(HoldImpl_CheckAttributes)
-
-lp.CharacterAdded:Connect(function(newChar)
-    canTrigger = true
-end)
+lp.CharacterAdded:Connect(function() canTrigger=true end)
 
 tabGameplay:CreateToggle({
-    Name = "Implement Fast Artful",
-    CurrentValue = getgenv().ImplementEnabled,
-    Callback = function(Value)
-        getgenv().ImplementEnabled = Value
-        print("[Implement Fast Artful] Bật:", Value)
-        if Value then
-            HoldImpl_CheckAttributes()
+    Name="Implement Fast Artful",
+    CurrentValue=getgenv().ImplementEnabled,
+    Callback=function(v)
+        getgenv().ImplementEnabled=v
+        if v then HoldImpl_CheckAttributes() end
+    end
+})
+
+-- ============================
+-- Settings Tab + Instant ProximityPrompt + Unload Script
+-- ============================
+local tabSettings = Window:CreateTab("Settings",4483362458)
+local instantPPEnabled=true
+
+tabSettings:CreateToggle({
+    Name="Instant ProximityPrompt",
+    CurrentValue=instantPPEnabled,
+    Callback=function(v)
+        instantPPEnabled=v
+        for _,p in ipairs(Workspace:GetDescendants()) do
+            if p:IsA("ProximityPrompt") then
+                if instantPPEnabled then p.HoldDuration=0
+                else p.HoldDuration=p:GetAttribute("OriginalHoldDuration") or 1 end
+            end
         end
-    end,
+    end
+})
+
+mainConns.workspaceDescendant = Workspace.DescendantAdded:Connect(function(obj)
+    if obj:IsA("ProximityPrompt") then
+        if obj:GetAttribute("OriginalHoldDuration")==nil then
+            obj:SetAttribute("OriginalHoldDuration",obj.HoldDuration)
+        end
+        if instantPPEnabled then obj.HoldDuration=0 end
+    end
+end)
+
+tabSettings:CreateButton({
+    Name="Unload Script",
+    Callback=function()
+        if unloaded then return end
+        unloaded=true
+
+        if Storage and Storage:IsA("Instance") then
+            pcall(function() Storage:ClearAllChildren() end)
+        end
+
+        for plr,conns in pairs(connections) do
+            if conns then
+                for _,conn in pairs(conns) do
+                    if typeof(conn)=="RBXScriptConnection" then pcall(function() conn:Disconnect() end) end
+                end
+            end
+            connections[plr]=nil
+        end
+
+        for k,conn in pairs(mainConns) do
+            if conn and typeof(conn)=="RBXScriptConnection" then pcall(function() conn:Disconnect() end) end
+            mainConns[k]=nil
+        end
+
+        local g = CoreGui:FindFirstChild("Rayfield")
+        if g then pcall(function() g:Destroy() end) end
+
+        warn("[SCRIPT] Đã Unload thành công.")
+    end
 })
