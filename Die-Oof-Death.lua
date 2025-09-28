@@ -255,11 +255,10 @@ mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- PART 2: Skills & Selector (Killer-aware, default buttons ON)
+-- PART 2: Skills & Selector
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
 local lp = lp or game:GetService("Players").LocalPlayer
-local Workspace = game:GetService("Workspace")
 
 local skillList = {"Revolver","Punch","Block","Caretaker","Hotdog","Taunt","Cloak","Dash","Banana","BonusPad","Adrenaline"}
 local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
@@ -352,7 +351,7 @@ local function makeDraggable(frame, skillName)
     end
 end
 
--- Create skill button with Killer-aware toggle
+-- Create skill button
 local function createSkillButton(skillName)
     local skillData = SkillsModule[skillName]
     if not skillData then return end
@@ -415,25 +414,6 @@ local function createSkillButton(skillName)
     button.Text = ""
     button.Parent = innerFrame
 
-    -- Killer-aware loop
-    spawn(function()
-        while btnFrame and btnFrame.Parent do
-            local killerTeam = Workspace:FindFirstChild("GameAssets")
-                and Workspace.GameAssets:FindFirstChild("Teams")
-                and Workspace.GameAssets.Teams:FindFirstChild("Killer")
-            local isKiller = killerTeam and killerTeam:FindFirstChild(lp.Name)
-
-            if isKiller then
-                btnFrame.Visible = false
-                button.Active = false
-            else
-                btnFrame.Visible = true
-                button.Active = true
-            end
-            wait(0.3)
-        end
-    end)
-
     -- Button click
     button.MouseButton1Click:Connect(function()
         local cooldown = tonumber(skillData.Cooldown) or 1
@@ -452,6 +432,53 @@ local function createSkillButton(skillName)
                     task.wait(1)
                     t -= 1
                 end
+                cooldownOverlay.Visible = false
+                cdLabel.Visible = false
+            end)
+        end
+    end)
+
+    makeDraggable(btnFrame, skillName)
+end
+
+-- Remove skill button
+local function removeSkillButton(skillName)
+    local old = guiStorage:FindFirstChild(skillName.."_Btn")
+    if old then old:Destroy() end
+end
+
+-- Create toggles + sliders for each skill
+for _, skillName in ipairs(skillList) do
+    local enabled = false
+
+    tabSkills:CreateToggle({
+        Name = "Enable "..skillName,
+        CurrentValue = false,
+        Callback = function(v)
+            enabled = v
+            if v then
+                createSkillButton(skillName)
+            else
+                removeSkillButton(skillName)
+            end
+        end
+    })
+
+    tabSkills:CreateSlider({
+        Name = skillName.." Size",
+        Range = {40,120},
+        Increment = 1,
+        CurrentValue = 46,
+        Callback = function(val)
+            if not buttonConfigs[skillName] then
+                buttonConfigs[skillName] = {size=val,pos={100,100}}
+            else
+                buttonConfigs[skillName].size = val
+            end
+            if enabled then createSkillButton(skillName) end
+        end
+    })
+end
 -- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI)
 
 local RunService = game:GetService("RunService")
