@@ -260,18 +260,18 @@ local tabSkills = Window:CreateTab("Skills & Selector", 4483362458)
 local skillParagraph = tabSkills:CreateParagraph({Title="Selected Skills", Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
 
 tabSkills:CreateDropdown({Name="Select Skill 1", Options=skillList, CurrentOption={selectedSkill1}, Callback=function(opt)
-    selectedSkill1 = opt[1]
-    skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
+selectedSkill1 = opt[1]
+skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
 end})
 
 tabSkills:CreateDropdown({Name="Select Skill 2", Options=skillList, CurrentOption={selectedSkill2}, Callback=function(opt)
-    selectedSkill2 = opt[1]
-    skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
+selectedSkill2 = opt[1]
+skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
 end})
 
 tabSkills:CreateButton({Name="Select Skills", Callback=function()
-    local abilitySelection = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteEvents"):WaitForChild("AbilitySelection")
-    abilitySelection:FireServer({selectedSkill1, selectedSkill2})
+local abilitySelection = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteEvents"):WaitForChild("AbilitySelection")
+abilitySelection:FireServer({selectedSkill1, selectedSkill2})
 end})
 
 -- Skill GUI (draggable buttons)
@@ -286,86 +286,89 @@ local buttonConfigs = {} -- [skillName] = {size,pos}
 local lastUsed = {}      -- [skillName] = os.clock()
 
 local function makeDraggable(frame, skillName)
-    local dragging, dragStart, startPos = false, Vector2.new(), frame.Position
-    local function update(input)
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
-    end
-    local function onInputBegan(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging=true; dragStart=input.Position; startPos=frame.Position
-            input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false; buttonConfigs[skillName].pos={frame.Position.X.Offset,frame.Position.Y.Offset} end end)
-        end
-    end
-    local function onInputChanged(input)
-        if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then update(input) end
-    end
-    frame.InputBegan:Connect(onInputBegan)
-    frame.InputChanged:Connect(onInputChanged)
-    for _, child in ipairs(frame:GetDescendants()) do
-        if child:IsA("GuiObject") then
-            child.InputBegan:Connect(onInputBegan)
-            child.InputChanged:Connect(onInputChanged)
-        end
-    end
+local dragging, dragStart, startPos = false, Vector2.new(), frame.Position
+local function update(input)
+local delta = input.Position - dragStart
+frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
+end
+local function onInputBegan(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+dragging=true; dragStart=input.Position; startPos=frame.Position
+input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false; buttonConfigs[skillName].pos={frame.Position.X.Offset,frame.Position.Y.Offset} end end)
+end
+end
+local function onInputChanged(input)
+if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then update(input) end
+end
+frame.InputBegan:Connect(onInputBegan)
+frame.InputChanged:Connect(onInputChanged)
+for _, child in ipairs(frame:GetDescendants()) do
+if child:IsA("GuiObject") then
+child.InputBegan:Connect(onInputBegan)
+child.InputChanged:Connect(onInputChanged)
+end
+end
 end
 
 local function createSkillButton(skillName)
-    local skillData = SkillsModule[skillName]
-    if not skillData then return end
-    local cfg = buttonConfigs[skillName] or {size=46,pos={100,100}}
-    buttonConfigs[skillName] = cfg
-    local old = guiStorage:FindFirstChild(skillName.."_Btn")
-    if old then old:Destroy() end
+local skillData = SkillsModule[skillName]
+if not skillData then return end
+local cfg = buttonConfigs[skillName] or {size=46,pos={100,100}}
+buttonConfigs[skillName] = cfg
+local old = guiStorage:FindFirstChild(skillName.."_Btn")
+if old then old:Destroy() end
 
-    local btnFrame = Instance.new("Frame")
-    btnFrame.Name = skillName.."_Btn"; btnFrame.Size=UDim2.new(0,cfg.size,0,cfg.size); btnFrame.Position=UDim2.new(0,cfg.pos[1],0,cfg.pos[2]); btnFrame.BackgroundTransparency=1; btnFrame.Parent=guiStorage
-    local border=Instance.new("UIStroke"); border.Thickness=2; border.Color=Color3.fromRGB(239,239,239); border.Parent=btnFrame
-    local innerFrame=Instance.new("Frame"); innerFrame.Size=UDim2.new(1,0,1,0); innerFrame.BackgroundColor3=Color3.fromRGB(0,0,0); innerFrame.BackgroundTransparency=0.5; innerFrame.BorderSizePixel=0; innerFrame.Parent=btnFrame
-    local icon=Instance.new("ImageLabel"); icon.Size=UDim2.new(0.9,0,0.9,0); icon.Position=UDim2.new(0.5,0,0.5,0); icon.AnchorPoint=Vector2.new(0.5,0.5); icon.BackgroundTransparency=1; icon.Image=skillData.Icon or ""; icon.ScaleType=Enum.ScaleType.Fit; icon.Parent=innerFrame
-    local cooldownOverlay=Instance.new("Frame"); cooldownOverlay.Size=UDim2.new(1,0,1,0); cooldownOverlay.BackgroundColor3=Color3.fromRGB(0,0,0); cooldownOverlay.BackgroundTransparency=0.6; cooldownOverlay.BorderSizePixel=0; cooldownOverlay.Visible=false; cooldownOverlay.Parent=innerFrame
-    local cdLabel=Instance.new("TextLabel"); cdLabel.Size=UDim2.new(1,0,1,0); cdLabel.BackgroundTransparency=1; cdLabel.TextColor3=Color3.fromRGB(255,255,255); cdLabel.TextScaled=true; cdLabel.Font=Enum.Font.GothamBold; cdLabel.Visible=false; cdLabel.Parent=cooldownOverlay
-    local button=Instance.new("TextButton"); button.Size=UDim2.new(1,0,1,0); button.BackgroundTransparency=1; button.Text=""; button.Parent=innerFrame
+local btnFrame = Instance.new("Frame")  
+btnFrame.Name = skillName.."_Btn"; btnFrame.Size=UDim2.new(0,cfg.size,0,cfg.size); btnFrame.Position=UDim2.new(0,cfg.pos[1],0,cfg.pos[2]); btnFrame.BackgroundTransparency=1; btnFrame.Parent=guiStorage  
+local border=Instance.new("UIStroke"); border.Thickness=2; border.Color=Color3.fromRGB(239,239,239); border.Parent=btnFrame  
+local innerFrame=Instance.new("Frame"); innerFrame.Size=UDim2.new(1,0,1,0); innerFrame.BackgroundColor3=Color3.fromRGB(0,0,0); innerFrame.BackgroundTransparency=0.5; innerFrame.BorderSizePixel=0; innerFrame.Parent=btnFrame  
+local icon=Instance.new("ImageLabel"); icon.Size=UDim2.new(0.9,0,0.9,0); icon.Position=UDim2.new(0.5,0,0.5,0); icon.AnchorPoint=Vector2.new(0.5,0.5); icon.BackgroundTransparency=1; icon.Image=skillData.Icon or ""; icon.ScaleType=Enum.ScaleType.Fit; icon.Parent=innerFrame  
+local cooldownOverlay=Instance.new("Frame"); cooldownOverlay.Size=UDim2.new(1,0,1,0); cooldownOverlay.BackgroundColor3=Color3.fromRGB(0,0,0); cooldownOverlay.BackgroundTransparency=0.6; cooldownOverlay.BorderSizePixel=0; cooldownOverlay.Visible=false; cooldownOverlay.Parent=innerFrame  
+local cdLabel=Instance.new("TextLabel"); cdLabel.Size=UDim2.new(1,0,1,0); cdLabel.BackgroundTransparency=1; cdLabel.TextColor3=Color3.fromRGB(255,255,255); cdLabel.TextScaled=true; cdLabel.Font=Enum.Font.GothamBold; cdLabel.Visible=false; cdLabel.Parent=cooldownOverlay  
+local button=Instance.new("TextButton"); button.Size=UDim2.new(1,0,1,0); button.BackgroundTransparency=1; button.Text=""; button.Parent=innerFrame  
 
-    button.MouseButton1Click:Connect(function()
-        local cooldown = tonumber(skillData.Cooldown) or 1
-        local now = os.clock()
-        if not lastUsed[skillName] or now-lastUsed[skillName]>=cooldown then
-            lastUsed[skillName]=now
-            local remoteFunc = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
-            pcall(function() remoteFunc:InvokeServer(skillName) end)
-            cooldownOverlay.Visible=true; cdLabel.Visible=true
-            task.spawn(function()
-                local t=cooldown
-                while t>0 do
-                    cdLabel.Text=tostring(math.ceil(t))
-                    task.wait(1)
-                    t-=1
-                end
-                cooldownOverlay.Visible=false; cdLabel.Visible=false
-            end)
-        end
-    end)
-    makeDraggable(btnFrame, skillName)
+button.MouseButton1Click:Connect(function()  
+    local cooldown = tonumber(skillData.Cooldown) or 1  
+    local now = os.clock()  
+    if not lastUsed[skillName] or now-lastUsed[skillName]>=cooldown then  
+        lastUsed[skillName]=now  
+        local remoteFunc = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")  
+        pcall(function() remoteFunc:InvokeServer(skillName) end)  
+        cooldownOverlay.Visible=true; cdLabel.Visible=true  
+        task.spawn(function()  
+            local t=cooldown  
+            while t>0 do  
+                cdLabel.Text=tostring(math.ceil(t))  
+                task.wait(1)  
+                t-=1  
+            end  
+            cooldownOverlay.Visible=false; cdLabel.Visible=false  
+        end)  
+    end  
+end)  
+makeDraggable(btnFrame, skillName)
+
 end
 
 local function removeSkillButton(skillName)
-    local old=guiStorage:FindFirstChild(skillName.."_Btn")
-    if old then old:Destroy() end
+local old=guiStorage:FindFirstChild(skillName.."_Btn")
+if old then old:Destroy() end
 end
 
 -- Create toggles + sliders for each skill using tabSkills
 for _, skillName in ipairs(skillList) do
-    local enabled=false
-    tabSkills:CreateToggle({Name="Enable "..skillName, CurrentValue=false, Callback=function(v)
-        enabled=v
-        if v then createSkillButton(skillName) else removeSkillButton(skillName) end
-    end})
-    tabSkills:CreateSlider({Name=skillName.." Size", Range={40,120}, Increment=1, CurrentValue=46, Callback=function(val)
-        if not buttonConfigs[skillName] then buttonConfigs[skillName]={size=val,pos={100,100}} else buttonConfigs[skillName].size=val end
-        if enabled then createSkillButton(skillName) end
-    end})
-                        end
+local enabled=false
+tabSkills:CreateToggle({Name="Enable "..skillName, CurrentValue=false, Callback=function(v)
+enabled=v
+if v then createSkillButton(skillName) else removeSkillButton(skillName) end
+end})
+tabSkills:CreateSlider({Name=skillName.." Size", Range={40,120}, Increment=1, CurrentValue=46, Callback=function(val)
+if not buttonConfigs[skillName] then buttonConfigs[skillName]={size=val,pos={100,100}} else buttonConfigs[skillName].size=val end
+if enabled then createSkillButton(skillName) end
+end})
+end
+
+                    
 -- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI)
 
 local RunService = game:GetService("RunService")
