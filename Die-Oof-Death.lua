@@ -371,7 +371,8 @@ for _, skillName in ipairs(skillList) do
         if enabled then createSkillButton(skillName) end
     end})
 end
--- PART 3: Gameplay Settings + Settings (Rayfield + Implement Fast Artful)
+-- ============================
+-- PART 3: Gameplay Settings + Settings (Rayfield + Implement Fast Artful + AntiWalls)
 -- expects Window, RunService, lp, Workspace, Storage, connections, mainConns, unloaded exist from Part1
 local RunService = RunService or game:GetService("RunService")
 local lp = lp or game:GetService("Players").LocalPlayer
@@ -473,9 +474,38 @@ mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
 end)
 
 -- ============================
+-- AntiWalls feature
+-- ============================
+AntiWalls = false
+
+tabGameplay:CreateToggle({
+    Name = "Anti-Artful Walls",
+    CurrentValue = AntiWalls,
+    Callback = function(Value)
+        AntiWalls = Value
+        if AntiWalls then
+            for _, v in pairs(Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Other"):GetDescendants()) do
+                if v and v.Name == "HumanoidRootPart" and v.Anchored then
+                    v.CanCollide = false
+                    v.CanTouch = false
+                    v.Transparency = 0.5
+                end
+            end
+        end
+    end
+})
+
+Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Other").DescendantAdded:Connect(function(descendant)
+    if descendant and descendant.Name == "HumanoidRootPart" and descendant.Anchored and AntiWalls then
+        descendant.CanCollide = false
+        descendant.CanTouch = false
+        descendant.Transparency = 0.5
+    end
+end)
+
+-- ============================
 -- Implement Fast Artful (HoldInAir) tích hợp Rayfield GUI
 -- ============================
-
 getgenv().ImplementEnabled = false
 local canTrigger = true
 
@@ -548,68 +578,4 @@ tabGameplay:CreateToggle({
             HoldImpl_CheckAttributes()
         end
     end,
-})
-
--- ============================
--- Settings tab
--- ============================
-local tabSettings = Window:CreateTab("Settings", 4483362458)
-
-local instantPPEnabled = true
-tabSettings:CreateToggle({
-    Name="Instant ProximityPrompt",
-    CurrentValue=instantPPEnabled,
-    Callback=function(v)
-        instantPPEnabled = v
-        for _, prompt in ipairs(Workspace:GetDescendants()) do
-            if prompt:IsA("ProximityPrompt") then
-                if instantPPEnabled then prompt.HoldDuration = 0
-                else prompt.HoldDuration = prompt:GetAttribute("OriginalHoldDuration") or 1 end
-            end
-        end
-    end
-})
-
-mainConns.workspaceDescendant = Workspace.DescendantAdded:Connect(function(obj)
-    if obj:IsA("ProximityPrompt") then
-        if obj:GetAttribute("OriginalHoldDuration") == nil then
-            obj:SetAttribute("OriginalHoldDuration", obj.HoldDuration)
-        end
-        if instantPPEnabled then obj.HoldDuration = 0 end
-    end
-end)
-
-tabSettings:CreateButton({
-    Name="Unload Script",
-    Callback=function()
-        if unloaded then return end
-        unloaded = true
-
-        if Storage and Storage:IsA("Instance") then
-            pcall(function() Storage:ClearAllChildren() end)
-        end
-
-        for plr, conns in pairs(connections) do
-            if conns then
-                for k, conn in pairs(conns) do
-                    if typeof(conn) == "RBXScriptConnection" then
-                        pcall(function() conn:Disconnect() end)
-                    end
-                end
-            end
-            connections[plr] = nil
-        end
-
-        for k, conn in pairs(mainConns) do
-            if conn and typeof(conn) == "RBXScriptConnection" then
-                pcall(function() conn:Disconnect() end)
-            end
-            mainConns[k] = nil
-        end
-
-        local g = CoreGui:FindFirstChild("Rayfield")
-        if g then pcall(function() g:Destroy() end) end
-
-        warn("[SCRIPT] Đã Unload thành công.")
-    end
 })
