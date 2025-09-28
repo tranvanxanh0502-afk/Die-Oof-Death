@@ -228,7 +228,6 @@ local tabBlock = Window:CreateTab("Auto Block", 4483362458)
 local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Nothing"})
 tabBlock:CreateToggle({Name="Enable Auto Block", CurrentValue=autoBlockEnabled, Callback=function(v) autoBlockEnabled=v end})
 tabBlock:CreateSlider({Name="Block Distance (studs)", Range={5,50}, Increment=1, CurrentValue=blockDistance, Callback=function(val) blockDistance=val end})
-
 local function doBlock(plr,dist)
     if unloaded then return end
     pcall(function()
@@ -253,78 +252,7 @@ mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- PART 2: Skills & Selector
--- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
-local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
-local lp = lp or game:GetService("Players").LocalPlayer
 
-local skillList = {"Revolver","Punch","Block","Caretaker","Hotdog","Taunt","Cloak","Dash","Banana","BonusPad","Adrenaline"}
-local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
-
-local tabSkills = Window:CreateTab("Skills & Selector", 4483362458)
-local skillParagraph = tabSkills:CreateParagraph({Title="Selected Skills", Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
-
-tabSkills:CreateDropdown({Name="Select Skill 1", Options=skillList, CurrentOption={selectedSkill1}, Callback=function(opt)
-    selectedSkill1 = opt[1]
-    skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
-end})
-
-tabSkills:CreateDropdown({Name="Select Skill 2", Options=skillList, CurrentOption={selectedSkill2}, Callback=function(opt)
-    selectedSkill2 = opt[1]
-    skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
-end})
-
-tabSkills:CreateButton({Name="Select Skills", Callback=function()
-    local abilitySelection = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteEvents"):WaitForChild("AbilitySelection")
-    abilitySelection:FireServer({selectedSkill1, selectedSkill2})
-end})
-
--- Skill GUI (draggable buttons)
-local SkillsModule = require(ReplicatedStorage.ClientModules:WaitForChild("AbilityConfig"))
-local guiStorage = lp:FindFirstChild("SkillScreenGui") or Instance.new("ScreenGui")
-guiStorage.Name = "SkillScreenGui"
-guiStorage.ResetOnSpawn = false
-guiStorage.IgnoreGuiInset = true
-guiStorage.Parent = lp:WaitForChild("PlayerGui")
-
-local buttonConfigs = {} -- [skillName] = {size,pos}
-local lastUsed = {}      -- [skillName] = os.clock()
-
-local function makeDraggable(frame, skillName)
-    local dragging, dragStart, startPos = false, Vector2.new(), frame.Position
-    local function update(input)
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
-    end
-    local function onInputBegan(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging=true; dragStart=input.Position; startPos=frame.Position
-            input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false; buttonConfigs[skillName].pos={frame.Position.X.Offset,frame.Position.Y.Offset} end end)
-        end
-    end
-    local function onInputChanged(input)
-        if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then update(input) end
-    end
-    frame.InputBegan:Connect(onInputBegan)
-    frame.InputChanged:Connect(onInputChanged)
-    for _, child in ipairs(frame:GetDescendants()) do
-        if child:IsA("GuiObject") then
-            child.InputBegan:Connect(onInputBegan)
-            child.InputChanged:Connect(onInputChanged)
-        end
-    end
-end
-
-local function createSkillButton(skillName)
-    local skillData = SkillsModule[skillName]
-    if not skillData then return end
-    local cfg = buttonConfigs[skillName] or {size=46,pos={100,100}}
-    buttonConfigs[skillName] = cfg
-    local old = guiStorage:FindFirstChild(skillName.."_Btn")
-    if old then old:Destroy() end
-
-    local btnFrame = Instance.new("Frame")
-    btnFrame.Name = skillName.."_Btn"; btnFrame.Size=UDim2.new(0,cfg.size,0,cfg.size); btnFrame.Position=UDim2.new(0,cfg.pos[1],0,cfg.pos[2]); btnFrame.BackgroundTransparency=1; btnFrame.Parent=guiStorage
 -- PART 2: Skills & Selector (Tích hợp trạng thái Revolver)
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
