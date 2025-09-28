@@ -255,10 +255,11 @@ mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- PART 2: Skills & Selector
+-- PART 2: Skills & Selector (Killer-aware, default buttons ON)
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
 local lp = lp or game:GetService("Players").LocalPlayer
+local Workspace = game:GetService("Workspace")
 
 local skillList = {"Revolver","Punch","Block","Caretaker","Hotdog","Taunt","Cloak","Dash","Banana","BonusPad","Adrenaline"}
 local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
@@ -351,7 +352,7 @@ local function makeDraggable(frame, skillName)
     end
 end
 
--- Create skill button
+-- Create skill button with Killer-aware toggle
 local function createSkillButton(skillName)
     local skillData = SkillsModule[skillName]
     if not skillData then return end
@@ -414,6 +415,25 @@ local function createSkillButton(skillName)
     button.Text = ""
     button.Parent = innerFrame
 
+    -- Killer-aware loop
+    spawn(function()
+        while btnFrame and btnFrame.Parent do
+            local killerTeam = Workspace:FindFirstChild("GameAssets")
+                and Workspace.GameAssets:FindFirstChild("Teams")
+                and Workspace.GameAssets.Teams:FindFirstChild("Killer")
+            local isKiller = killerTeam and killerTeam:FindFirstChild(lp.Name)
+
+            if isKiller then
+                btnFrame.Visible = false
+                button.Active = false
+            else
+                btnFrame.Visible = true
+                button.Active = true
+            end
+            wait(0.3)
+        end
+    end)
+
     -- Button click
     button.MouseButton1Click:Connect(function()
         local cooldown = tonumber(skillData.Cooldown) or 1
@@ -447,13 +467,13 @@ local function removeSkillButton(skillName)
     if old then old:Destroy() end
 end
 
--- Create toggles + sliders for each skill
+-- Create toggles + sliders for each skill, default ON
 for _, skillName in ipairs(skillList) do
-    local enabled = false
+    local enabled = true  -- mặc định bật
 
     tabSkills:CreateToggle({
         Name = "Enable "..skillName,
-        CurrentValue = false,
+        CurrentValue = true,  -- toggle mặc định bật
         Callback = function(v)
             enabled = v
             if v then
@@ -478,6 +498,9 @@ for _, skillName in ipairs(skillList) do
             if enabled then createSkillButton(skillName) end
         end
     })
+
+    -- Tạo skill button ngay lập tức vì mặc định bật
+    createSkillButton(skillName)
 end
 -- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI)
 
