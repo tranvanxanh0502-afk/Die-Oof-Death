@@ -247,13 +247,7 @@ mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
             local teamName = plr.Character.Parent and plr.Character.Parent.Name
             if teamName == "Killer" then
                 local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
-                if dist <= blockDistance then doBlock(plr,dist) end
-            end
-        end
-    end
-end)
-
--- PART 2: Skills & Selector (Tích hợp trạng thái Revolver)
+                if dist <= blockDistance then doBlock(plr,dist) end-- PART 2: Skills & Selector
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
 local lp = lp or game:GetService("Players").LocalPlayer
@@ -261,43 +255,23 @@ local lp = lp or game:GetService("Players").LocalPlayer
 local skillList = {"Revolver","Punch","Block","Caretaker","Hotdog","Taunt","Cloak","Dash","Banana","BonusPad","Adrenaline"}
 local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
 
--- Tab Skills & Selector
 local tabSkills = Window:CreateTab("Skills & Selector", 4483362458)
-local skillParagraph = tabSkills:CreateParagraph({
-    Title="Selected Skills",
-    Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2
-})
+local skillParagraph = tabSkills:CreateParagraph({Title="Selected Skills", Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
 
--- Dropdown chọn skill 1
-tabSkills:CreateDropdown({
-    Name="Select Skill 1",
-    Options=skillList,
-    CurrentOption={selectedSkill1},
-    Callback=function(opt)
-        selectedSkill1 = opt[1]
-        skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
-    end
-})
+tabSkills:CreateDropdown({Name="Select Skill 1", Options=skillList, CurrentOption={selectedSkill1}, Callback=function(opt)
+    selectedSkill1 = opt[1]
+    skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
+end})
 
--- Dropdown chọn skill 2
-tabSkills:CreateDropdown({
-    Name="Select Skill 2",
-    Options=skillList,
-    CurrentOption={selectedSkill2},
-    Callback=function(opt)
-        selectedSkill2 = opt[1]
-        skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
-    end
-})
+tabSkills:CreateDropdown({Name="Select Skill 2", Options=skillList, CurrentOption={selectedSkill2}, Callback=function(opt)
+    selectedSkill2 = opt[1]
+    skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
+end})
 
--- Button gửi skill lên server
-tabSkills:CreateButton({
-    Name="Select Skills",
-    Callback=function()
-        local abilitySelection = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteEvents"):WaitForChild("AbilitySelection")
-        abilitySelection:FireServer({selectedSkill1, selectedSkill2})
-    end
-})
+tabSkills:CreateButton({Name="Select Skills", Callback=function()
+    local abilitySelection = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteEvents"):WaitForChild("AbilitySelection")
+    abilitySelection:FireServer({selectedSkill1, selectedSkill2})
+end})
 
 -- Skill GUI (draggable buttons)
 local SkillsModule = require(ReplicatedStorage.ClientModules:WaitForChild("AbilityConfig"))
@@ -317,7 +291,7 @@ local function makeDraggable(frame, skillName)
         frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
     end
     local function onInputBegan(input)
-        if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging=true; dragStart=input.Position; startPos=frame.Position
             input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false; buttonConfigs[skillName].pos={frame.Position.X.Offset,frame.Position.Y.Offset} end end)
         end
@@ -379,7 +353,7 @@ local function removeSkillButton(skillName)
     if old then old:Destroy() end
 end
 
--- Tạo toggle + slider cho từng skill
+-- Create toggles + sliders for each skill using tabSkills
 for _, skillName in ipairs(skillList) do
     local enabled=false
     tabSkills:CreateToggle({Name="Enable "..skillName, CurrentValue=false, Callback=function(v)
@@ -390,31 +364,7 @@ for _, skillName in ipairs(skillList) do
         if not buttonConfigs[skillName] then buttonConfigs[skillName]={size=val,pos={100,100}} else buttonConfigs[skillName].size=val end
         if enabled then createSkillButton(skillName) end
     end})
-end
-
--- =============================
--- Thêm phần trạng thái Revolver
--- =============================
-local revolverLabel = Instance.new("TextLabel")
-revolverLabel.Name = "RevolverStatus"
-revolverLabel.Size = UDim2.new(0,50,0,20)
-revolverLabel.Position = UDim2.new(0,10,0,10) -- góc GUI, có thể chỉnh
-revolverLabel.BackgroundTransparency = 1
-revolverLabel.TextScaled = true
-revolverLabel.Font = Enum.Font.SourceSansBold
-revolverLabel.TextColor3 = Color3.fromRGB(255,255,0)
-revolverLabel.TextStrokeColor3 = Color3.fromRGB(255,0,0)
-revolverLabel.TextStrokeTransparency = 0
-revolverLabel.Visible = false
-revolverLabel.Parent = guiStorage
-
-local function updateRevolverStatus()
-    local noAmmo = lp:FindFirstChild("NoRevolverAmmo") and lp.NoRevolverAmmo.Value
-    local cooldown = lp:FindFirstChild("RevolverCooldown    local border=Instance.new("UIStroke"); border.Thickness=2; border.Color=Color3.fromRGB(239,239,239); border.Parent=btnFrame
-    local innerFrame=Instance.new("Frame"); innerFrame.Size=UDim2.new(1,0,1,0); innerFrame.BackgroundColor3=Color3.fromRGB(0,0,0); innerFrame.BackgroundTransparency=0.5; innerFrame.BorderSizePixel=0; innerFrame.Parent=btnFrame
-    local icon=Instance.new("ImageLabel"); icon.Size=UDim2.new(0.9,0,0.9,0); icon.Position=UDim2.new(0.5,0,0.5,0); icon.AnchorPoint=Vector2.new(0.5,0.5); icon.BackgroundTransparency=1; icon.Image=skillData.Icon or ""; icon.ScaleType=Enum.ScaleType.Fit; icon.Parent=innerFrame
-    local cooldownOverlay=Instance.new("Frame"); cooldownOverlay.Size=UDim2.new(1,0,1,0); cooldownOverlay.BackgroundColor3=Color3.fromRGB(0,0,0); cooldownOverlay.BackgroundTransparency=0.6; cooldownOverlay.BorderSizePixel=0; cooldownOverlay.Visible=false; cooldownOverlay.Parent=innerFrame
-    local cdLabel=Instance.new("TextLabel"); cdLabel.Size=UDim2.new(1,0,1,0); cdLabel.BackgroundTransparency=1; cdLabel.TextColor3=Color3.fromRGB(255,255,255); cdLabel.TextScaled=true; cdLabel.Font=Enum.Font.GothamBold; cdLabel.Visible=false; cdLabel.Parent=cooldownOverlay
+                        end
 -- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI)
 
 local RunService = game:GetService("RunService")
