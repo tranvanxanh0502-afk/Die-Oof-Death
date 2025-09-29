@@ -220,7 +220,7 @@ tabBlock:CreateSlider({
     Callback=function(val) blockDistance=val end
 })
 tabBlock:CreateToggle({
-    Name="Remove Animation (134233326423882)",
+    Name="Delete Block(Animation)",
     CurrentValue=removeAnimEnabled,
     Callback=function(v) removeAnimEnabled=v end
 })
