@@ -420,7 +420,7 @@ local function createSkillButton(skillName)
 
     local border = Instance.new("UIStroke")
     border.Thickness = 2
-    border.Color = Color3.fromRGB(239,239,239)
+    border.Color = Color3.fromRGB(197,197,197)
     border.Parent = btnFrame
 
     local innerFrame = Instance.new("Frame")
