@@ -196,14 +196,16 @@ local walkSpeedValue = character:GetAttribute("WalkSpeed")
 local sprintSpeedValue = character:GetAttribute("SprintSpeed")
 local walkSpeedEnabled = false
 local sprintEnabled = false
+
+
 -- Auto Block
 local autoBlockEnabled = false
 local blockDistance = 15
 local removeAnimEnabled = false -- toggle xóa animation
-local blockCooldown = 0
+local showCooldown = 0 -- chỉ để hiển thị, không chặn block
 
 local tabBlock = Window:CreateTab("Auto Block", 4483362458)
-local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="turn it off before you make a killer(Auto Block)"})
+local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Nothing"})
 
 tabBlock:CreateToggle({
     Name="Enable Auto Block",
@@ -217,39 +219,36 @@ tabBlock:CreateSlider({
     Callback=function(val) blockDistance=val end
 })
 tabBlock:CreateToggle({
-    Name="Delete Block(Animation)",
+    Name="Remove Animation (134233326423882)",
     CurrentValue=removeAnimEnabled,
     Callback=function(v) removeAnimEnabled=v end
 })
 
 local function doBlock(plr,dist)
-    if unloaded or blockCooldown > 0 then return end
+    if unloaded then return end
     pcall(function()
-        if useAbilityRF then
-            useAbilityRF:InvokeServer("Block")
-        end
+        if useAbilityRF then useAbilityRF:InvokeServer("Block") end
     end)
 
-    -- chỉ log 1 lần khi bắt đầu block
-    blockCooldown = 40
+    -- chỉ để hiển thị cooldown, block vẫn chạy bình thường
+    showCooldown = 40
     task.spawn(function()
-        while blockCooldown > 0 and not unloaded do
-            -- chỉ update GUI, không in console
+        while showCooldown > 0 and not unloaded do
             logLabel:Set({
-                Content=("Blocked %s (%.0f studs) | Cooldown: %ds"):format(plr.Name, dist, blockCooldown)
+                Content=("Blocked %s (%.0f studs) | Cooldown: %ds"):format(plr.Name, dist, showCooldown)
             })
             task.wait(1)
-            blockCooldown = blockCooldown - 1
+            showCooldown = showCooldown - 1
         end
         if not unloaded then
-            logLabel:Set({Content="turn it off before you make a killer(Auto Block)"})
+            logLabel:Set({Content="Nothing"})
         end
     end)
 end
 
 -- Auto Block loop
 mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
-    if unloaded or not autoBlockEnabled or blockCooldown > 0 then return end
+    if unloaded or not autoBlockEnabled then return end
     local myChar = lp.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myHRP then return end
@@ -262,12 +261,12 @@ mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
                 local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
                 if dist <= blockDistance then
                     doBlock(plr, dist)
-                    break -- ngăn spam nhiều lần khi nhiều killer gần
                 end
             end
         end
     end
 end)
+
 -- Remove animation loop
 task.spawn(function()
     while not unloaded do
@@ -284,6 +283,8 @@ task.spawn(function()
         end
     end
 end)
+
+
 local tabSpeed = Window:CreateTab("Speed Settings", 4483362458)
 tabSpeed:CreateSlider({Name="WalkSpeed", Range={8,200}, Increment=1, CurrentValue=walkSpeedValue, Callback=function(val) walkSpeedValue=val end})
 tabSpeed:CreateToggle({Name="Enable WalkSpeed", CurrentValue=walkSpeedEnabled, Callback=function(v) walkSpeedEnabled=v; if not v and character then character:SetAttribute("WalkSpeed",10) end end})
