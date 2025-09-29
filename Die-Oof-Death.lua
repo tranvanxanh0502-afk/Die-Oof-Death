@@ -203,7 +203,7 @@ local removeAnimEnabled = false -- toggle xóa animation
 local blockCooldown = 0
 
 local tabBlock = Window:CreateTab("Auto Block", 4483362458)
-local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Nothing"})
+local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="turn it off before you make a killer(Auto Block)"})
 
 tabBlock:CreateToggle({
     Name="Enable Auto Block",
