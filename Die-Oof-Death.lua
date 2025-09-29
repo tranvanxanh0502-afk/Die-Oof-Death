@@ -238,7 +238,7 @@ local function doBlock(plr,dist)
             blockCooldown = blockCooldown - 1
         end
         if not unloaded then
-            logLabel:Set({Content="Nothing"})
+            logLabel:Set({Content="turn it off before you make a killer"})
         end
     end)
 end
