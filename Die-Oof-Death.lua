@@ -196,35 +196,11 @@ local walkSpeedValue = character:GetAttribute("WalkSpeed")
 local sprintSpeedValue = character:GetAttribute("SprintSpeed")
 local walkSpeedEnabled = false
 local sprintEnabled = false
-
-local tabSpeed = Window:CreateTab("Speed Settings", 4483362458)
-tabSpeed:CreateSlider({Name="WalkSpeed", Range={8,200}, Increment=1, CurrentValue=walkSpeedValue, Callback=function(val) walkSpeedValue=val end})
-tabSpeed:CreateToggle({Name="Enable WalkSpeed", CurrentValue=walkSpeedEnabled, Callback=function(v) walkSpeedEnabled=v; if not v and character then character:SetAttribute("WalkSpeed",10) end end})
-tabSpeed:CreateSlider({Name="SprintSpeed", Range={16,300}, Increment=1, CurrentValue=sprintSpeedValue, Callback=function(val) sprintSpeedValue=val end})
-tabSpeed:CreateToggle({Name="Enable Sprint", CurrentValue=sprintEnabled, Callback=function(v) sprintEnabled=v; if not v and character then character:SetAttribute("SprintSpeed",27) end end})
-
-mainConns.renderStepped = RunService.RenderStepped:Connect(function()
-    if unloaded then return end
-    local char = lp.Character
-    if not char then return end
-    if walkSpeedEnabled and char:GetAttribute("WalkSpeed") ~= walkSpeedValue then
-        char:SetAttribute("WalkSpeed", walkSpeedValue)
-    end
-    if sprintEnabled and char:GetAttribute("SprintSpeed") ~= sprintSpeedValue then
-        char:SetAttribute("SprintSpeed", sprintSpeedValue)
-    end
-end)
-
-mainConns.charAdded_speed = lp.CharacterAdded:Connect(function(char)
-    character = char
-    if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed",walkSpeedValue) end
-    if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed",sprintSpeedValue) end
-end)
-
 -- Auto Block
 local autoBlockEnabled = false
 local blockDistance = 15
 local removeAnimEnabled = false -- toggle xóa animation
+local blockCooldown = 0
 
 local tabBlock = Window:CreateTab("Auto Block", 4483362458)
 local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Nothing"})
@@ -241,22 +217,35 @@ tabBlock:CreateSlider({
     Callback=function(val) blockDistance=val end
 })
 tabBlock:CreateToggle({
-    Name="Delete Animation Block",
+    Name="Delete Block(Animation)",
     CurrentValue=removeAnimEnabled,
     Callback=function(v) removeAnimEnabled=v end
 })
 
 local function doBlock(plr,dist)
-    if unloaded then return end
+    if unloaded or blockCooldown > 0 then return end
     pcall(function()
         if useAbilityRF then useAbilityRF:InvokeServer("Block") end
     end)
-    logLabel:Set({Content="Blocked "..plr.Name.." ("..math.floor(dist).." studs)"})
+
+    blockCooldown = 40 -- set cooldown 40s
+    task.spawn(function()
+        while blockCooldown > 0 and not unloaded do
+            logLabel:Set({
+                Content=("Blocked %s (%.0f studs) | Cooldown: %ds"):format(plr.Name, dist, blockCooldown)
+            })
+            task.wait(1)
+            blockCooldown = blockCooldown - 1
+        end
+        if not unloaded then
+            logLabel:Set({Content="Nothing"})
+        end
+    end)
 end
 
 -- Auto Block loop
 mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
-    if unloaded or not autoBlockEnabled then return end
+    if unloaded or not autoBlockEnabled or blockCooldown > 0 then return end
     local myChar = lp.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myHRP then return end
@@ -291,6 +280,30 @@ task.spawn(function()
         end
     end
 end)
+local tabSpeed = Window:CreateTab("Speed Settings", 4483362458)
+tabSpeed:CreateSlider({Name="WalkSpeed", Range={8,200}, Increment=1, CurrentValue=walkSpeedValue, Callback=function(val) walkSpeedValue=val end})
+tabSpeed:CreateToggle({Name="Enable WalkSpeed", CurrentValue=walkSpeedEnabled, Callback=function(v) walkSpeedEnabled=v; if not v and character then character:SetAttribute("WalkSpeed",10) end end})
+tabSpeed:CreateSlider({Name="SprintSpeed", Range={16,300}, Increment=1, CurrentValue=sprintSpeedValue, Callback=function(val) sprintSpeedValue=val end})
+tabSpeed:CreateToggle({Name="Enable Sprint", CurrentValue=sprintEnabled, Callback=function(v) sprintEnabled=v; if not v and character then character:SetAttribute("SprintSpeed",27) end end})
+
+mainConns.renderStepped = RunService.RenderStepped:Connect(function()
+    if unloaded then return end
+    local char = lp.Character
+    if not char then return end
+    if walkSpeedEnabled and char:GetAttribute("WalkSpeed") ~= walkSpeedValue then
+        char:SetAttribute("WalkSpeed", walkSpeedValue)
+    end
+    if sprintEnabled and char:GetAttribute("SprintSpeed") ~= sprintSpeedValue then
+        char:SetAttribute("SprintSpeed", sprintSpeedValue)
+    end
+end)
+
+mainConns.charAdded_speed = lp.CharacterAdded:Connect(function(char)
+    character = char
+    if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed",walkSpeedValue) end
+    if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed",sprintSpeedValue) end
+end)
+
 -- PART 2: Skills & Selector
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
