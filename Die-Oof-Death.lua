@@ -6,7 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local lp = Players.LocalPlayer
 
-connections = connections or {}    -- global tables so other parts can reference if needed
+connections = connections or {}
 mainConns = mainConns or {}
 unloaded = false
 
@@ -45,14 +45,10 @@ do
     local ok, lib = pcall(function()
         return loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
     end)
-    Rayfield = (ok and lib and lib.CreateWindow) and lib or {}
-    -- Ghi đè Notify để tắt thông báo
-    if Rayfield.Notify then
-        Rayfield.Notify = function() end
-    end
+    Rayfield = (ok and lib and lib.CreateWindow) and lib or makeFallbackRayfield()
+    if Rayfield.Notify then Rayfield.Notify = function() end end
 end
 
--- Window is global on purpose so other parts can use it
 Window = Rayfield:CreateWindow({
     Name="HUB (Die of Death)TY @maxiedsu/gonnered",
     LoadingTitle="Loading...TY @maxiedsu/gonnered",
@@ -60,7 +56,7 @@ Window = Rayfield:CreateWindow({
     ConfigurationSaving={Enabled=false}
 })
 
--- helper label maker for nametag
+-- ========== ESP ==========
 local function createLabel(name,parent,posY)
     local label = Instance.new("TextLabel")
     label.Name = name
@@ -101,34 +97,33 @@ local function createOrUpdateESP(plr, char)
     local cfg = espConfigs[team]
     if not cfg or not humanoid then return end
 
-    local highlight = Storage:FindFirstChild(plr.Name.."_Highlight")
-    if not highlight then
-        highlight = Instance.new("Highlight")
-        highlight.Name = plr.Name.."_Highlight"
-        highlight.DepthMode = DepthMode
-        highlight.Parent = Storage
+    -- luôn xóa ESP cũ trước khi tạo mới
+    for _, suffix in ipairs({"_Highlight","_Nametag"}) do
+        local old = Storage:FindFirstChild(plr.Name..suffix)
+        if old then pcall(function() old:Destroy() end) end
     end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = plr.Name.."_Highlight"
+    highlight.DepthMode = DepthMode
     highlight.Adornee = char
     highlight.Enabled = cfg.Enabled
     highlight.FillColor = cfg.FillColor
     highlight.OutlineColor = cfg.OutlineColor
     highlight.FillTransparency = (cfg.Fill and cfg.FillTransparency) or 1
     highlight.OutlineTransparency = (cfg.Outline and cfg.OutlineTransparency) or 1
+    highlight.Parent = Storage
 
     if hrp then
-        local nametag = Storage:FindFirstChild(plr.Name.."_Nametag")
-        if not nametag then
-            nametag = Instance.new("BillboardGui")
-            nametag.Name = plr.Name.."_Nametag"
-            nametag.Size = UDim2.new(0,120,0,40)
-            nametag.StudsOffset = Vector3.new(0,2.5,0)
-            nametag.AlwaysOnTop = true
-            nametag.Parent = Storage
-            createLabel("PlayerName", nametag, 0).Text = plr.Name
-            createLabel("HealthLabel", nametag, 0.5)
-        end
+        local nametag = Instance.new("BillboardGui")
+        nametag.Name = plr.Name.."_Nametag"
+        nametag.Size = UDim2.new(0,120,0,40)
+        nametag.StudsOffset = Vector3.new(0,2.5,0)
+        nametag.AlwaysOnTop = true
         nametag.Adornee = hrp
-        nametag.Enabled = cfg.Enabled
+        nametag.Parent = Storage
+        createLabel("PlayerName", nametag, 0).Text = plr.Name
+        createLabel("HealthLabel", nametag, 0.5)
         local nameLabel = nametag:FindFirstChild("PlayerName")
         local healthLabel = nametag:FindFirstChild("HealthLabel")
         if nameLabel then nameLabel.Visible = cfg.Enabled and cfg.Name; nameLabel.TextColor3 = cfg.FillColor end
@@ -165,13 +160,13 @@ mainConns.playersAdded = Players.PlayerAdded:Connect(onPlayerAdded)
 mainConns.playersRemoving = Players.PlayerRemoving:Connect(onPlayerRemoving)
 for _,v in ipairs(Players:GetPlayers()) do onPlayerAdded(v) end
 
+-- auto refresh ESP mỗi giây
 task.spawn(function()
     while not unloaded do
         task.wait(1)
         for _,v in ipairs(Players:GetPlayers()) do
             if v ~= lp and v.Character then createOrUpdateESP(v, v.Character) end
         end
-        if unloaded then break end
     end
 end)
 
@@ -188,7 +183,7 @@ for teamName, cfg in pairs(espConfigs) do
     tab:CreateSlider({Name="Outline Transparency", Range={0,1}, Increment=0.05, CurrentValue=cfg.OutlineTransparency, Callback=function(v) cfg.OutlineTransparency=v end})
 end
 
--- Speed settings
+-- ========== Speed ==========
 local character = lp.Character or lp.CharacterAdded:Wait()
 if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed",10) end
 if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed",27) end
@@ -196,104 +191,6 @@ local walkSpeedValue = character:GetAttribute("WalkSpeed")
 local sprintSpeedValue = character:GetAttribute("SprintSpeed")
 local walkSpeedEnabled = false
 local sprintEnabled = false
-
-
--- Auto Block
-local autoBlockEnabled = false
-local blockDistance = 15
-local removeAnimEnabled = false
-local showCooldown = 0
-local coolingDown = false -- tránh countdown bị lặp
-
-local tabBlock = Window:CreateTab("Auto Block", 4483362458)
-local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Turn off Auto Block(You killer)"})
-
-tabBlock:CreateToggle({
-    Name="Enable Auto Block",
-    CurrentValue=autoBlockEnabled,
-    Callback=function(v) autoBlockEnabled=v end
-})
-tabBlock:CreateSlider({
-    Name="Block Distance (studs)",
-    Range={5,50}, Increment=1,
-    CurrentValue=blockDistance,
-    Callback=function(val) blockDistance=val end
-})
-tabBlock:CreateToggle({
-    Name="Delete Block(Animation)",
-    CurrentValue=removeAnimEnabled,
-    Callback=function(v) removeAnimEnabled=v end
-})
-
-local function doBlock(plr, dist)
-    if unloaded then return end
-
-    -- luôn gửi block
-    pcall(function()
-        if useAbilityRF then
-            useAbilityRF:InvokeServer("Block")
-        end
-    end)
-
-    -- khởi động countdown hiển thị
-    if not coolingDown then
-        coolingDown = true
-        showCooldown = 40
-        task.spawn(function()
-            while showCooldown > 0 and not unloaded do
-                logLabel:Set({
-                    Content = ("Blocked %s (%.0f studs) | Cooldown: %ds")
-                        :format(plr.Name, dist, showCooldown)
-                })
-                task.wait(1)
-                showCooldown -= 1
-            end
-            if not unloaded then
-                logLabel:Set({Content = "Turn off Auto Block(You killer)"})
-            end
-            coolingDown = false
-        end)
-    end
-end
-
--- Auto Block loop
-mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
-    if unloaded or not autoBlockEnabled then return end
-    local myChar = lp.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return end
-    local myPos = myHRP.Position
-
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local teamName = plr.Character.Parent and plr.Character.Parent.Name
-            if teamName == "Killer" then
-                local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
-                if dist <= blockDistance then
-                    doBlock(plr, dist)
-                end
-            end
-        end
-    end
-end)
-
--- Remove animation loop
-task.spawn(function()
-    while not unloaded do
-        task.wait(0.1)
-        if removeAnimEnabled and lp.Character then
-            local humanoid = lp.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
-                    if track.Animation and tostring(track.Animation.AnimationId):match("134233326423882") then
-                        track:Stop()
-                    end
-                end
-            end
-        end
-    end
-end)        
-
 
 local tabSpeed = Window:CreateTab("Speed Settings", 4483362458)
 tabSpeed:CreateSlider({Name="WalkSpeed", Range={8,200}, Increment=1, CurrentValue=walkSpeedValue, Callback=function(val) walkSpeedValue=val end})
@@ -319,6 +216,93 @@ mainConns.charAdded_speed = lp.CharacterAdded:Connect(function(char)
     if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed",sprintSpeedValue) end
 end)
 
+-- ========== Auto Block ==========
+local autoBlockEnabled = false
+local blockDistance = 15
+local removeAnimEnabled = false
+local showCooldown = 0
+local coolingDown = false
+
+local tabBlock = Window:CreateTab("Auto Block", 4483362458)
+local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Turn off Auto Block(You killer)"})
+
+tabBlock:CreateToggle({
+    Name="Enable Auto Block",
+    CurrentValue=autoBlockEnabled,
+    Callback=function(v) autoBlockEnabled=v end
+})
+tabBlock:CreateSlider({
+    Name="Block Distance (studs)",
+    Range={5,50}, Increment=1,
+    CurrentValue=blockDistance,
+    Callback=function(val) blockDistance=val end
+})
+tabBlock:CreateToggle({
+    Name="Delete Block(Animation)",
+    CurrentValue=removeAnimEnabled,
+    Callback=function(v) removeAnimEnabled=v end
+})
+
+local function doBlock(plr, dist)
+    if unloaded then return end
+    pcall(function()
+        if useAbilityRF then useAbilityRF:InvokeServer("Block") end
+    end)
+    if not coolingDown then
+        coolingDown = true
+        showCooldown = 40
+        task.spawn(function()
+            while showCooldown > 0 and not unloaded do
+                logLabel:Set({
+                    Content = ("Blocked %s (%.0f studs) | Cooldown: %ds")
+                        :format(plr.Name, dist, showCooldown)
+                })
+                task.wait(1)
+                showCooldown -= 1
+            end
+            if not unloaded then
+                logLabel:Set({Content = "Turn off Auto Block(You killer)"})
+            end
+            coolingDown = false
+        end)
+    end
+end
+
+mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
+    if unloaded or not autoBlockEnabled then return end
+    local myChar = lp.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+    local myPos = myHRP.Position
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local teamName = plr.Character.Parent and plr.Character.Parent.Name
+            if teamName == "Killer" then
+                local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
+                if dist <= blockDistance then
+                    doBlock(plr, dist)
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while not unloaded do
+        task.wait(0.1)
+        if removeAnimEnabled and lp.Character then
+            local humanoid = lp.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                    if track.Animation and tostring(track.Animation.AnimationId):match("134233326423882") then
+                        track:Stop()
+                    end
+                end
+            end
+        end
+    end
+end)
 -- PART 2: Skills & Selector
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
