@@ -201,11 +201,12 @@ local sprintEnabled = false
 -- Auto Block
 local autoBlockEnabled = false
 local blockDistance = 15
-local removeAnimEnabled = false -- toggle xóa animation
-local showCooldown = 0 -- chỉ để hiển thị, không chặn block
+local removeAnimEnabled = false
+local showCooldown = 0
+local coolingDown = false -- tránh countdown bị lặp
 
 local tabBlock = Window:CreateTab("Auto Block", 4483362458)
-local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Nothing"})
+local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Turn off Auto Block(You killer)"})
 
 tabBlock:CreateToggle({
     Name="Enable Auto Block",
@@ -224,26 +225,35 @@ tabBlock:CreateToggle({
     Callback=function(v) removeAnimEnabled=v end
 })
 
-local function doBlock(plr,dist)
+local function doBlock(plr, dist)
     if unloaded then return end
+
+    -- luôn gửi block
     pcall(function()
-        if useAbilityRF then useAbilityRF:InvokeServer("Block") end
+        if useAbilityRF then
+            useAbilityRF:InvokeServer("Block")
+        end
     end)
 
-    -- chỉ để hiển thị cooldown, block vẫn chạy bình thường
-    showCooldown = 40
-    task.spawn(function()
-        while showCooldown > 0 and not unloaded do
-            logLabel:Set({
-                Content=("Blocked %s (%.0f studs) | Cooldown: %ds"):format(plr.Name, dist, showCooldown)
-            })
-            task.wait(1)
-            showCooldown = showCooldown - 1
-        end
-        if not unloaded then
-            logLabel:Set({Content="Nothing"})
-        end
-    end)
+    -- khởi động countdown hiển thị
+    if not coolingDown then
+        coolingDown = true
+        showCooldown = 40
+        task.spawn(function()
+            while showCooldown > 0 and not unloaded do
+                logLabel:Set({
+                    Content = ("Blocked %s (%.0f studs) | Cooldown: %ds")
+                        :format(plr.Name, dist, showCooldown)
+                })
+                task.wait(1)
+                showCooldown -= 1
+            end
+            if not unloaded then
+                logLabel:Set({Content = "Turn off Auto Block(You killer)"})
+            end
+            coolingDown = false
+        end)
+    end
 end
 
 -- Auto Block loop
@@ -282,7 +292,7 @@ task.spawn(function()
             end
         end
     end
-end)
+end)        
 
 
 local tabSpeed = Window:CreateTab("Speed Settings", 4483362458)
