@@ -479,7 +479,7 @@ for _, skillName in ipairs(skillList) do
         end
     })
 end
--- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI)
+-- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI + AntiAnim)
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -618,6 +618,37 @@ end)
 
 Workspace.GameAssets.Teams.Other.DescendantAdded:Connect(function(desc)
     if AntiWalls then HandleWallPart(desc) end
+end)
+
+-- ============================
+-- Anti Animation (ID:134233326423882)
+-- ============================
+local AntiAnim = false
+local blockedAnimId = "134233326423882"
+
+tabGameplay:CreateToggle({
+    Name="delete animation block",
+    CurrentValue=AntiAnim,
+    Callback=function(v) AntiAnim=v end
+})
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if AntiAnim then
+            local char = lp.Character
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid:FindFirstChild("Animator") then
+                for _, track in ipairs(humanoid.Animator:GetPlayingAnimationTracks()) do
+                    if track.Animation and tostring(track.Animation.AnimationId):find(blockedAnimId) then
+                        track:Stop()
+                        track:Destroy()
+                        warn("Đã xoá animation bị chặn: "..blockedAnimId)
+                    end
+                end
+            end
+        end
+    end
 end)
 
 -- ============================
