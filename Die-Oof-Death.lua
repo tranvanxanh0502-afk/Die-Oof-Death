@@ -225,12 +225,16 @@ tabBlock:CreateToggle({
 local function doBlock(plr,dist)
     if unloaded or blockCooldown > 0 then return end
     pcall(function()
-        if useAbilityRF then useAbilityRF:InvokeServer("Block") end
+        if useAbilityRF then
+            useAbilityRF:InvokeServer("Block")
+        end
     end)
 
-    blockCooldown = 40 -- set cooldown 40s
+    -- chỉ log 1 lần khi bắt đầu block
+    blockCooldown = 40
     task.spawn(function()
         while blockCooldown > 0 and not unloaded do
+            -- chỉ update GUI, không in console
             logLabel:Set({
                 Content=("Blocked %s (%.0f studs) | Cooldown: %ds"):format(plr.Name, dist, blockCooldown)
             })
@@ -238,7 +242,7 @@ local function doBlock(plr,dist)
             blockCooldown = blockCooldown - 1
         end
         if not unloaded then
-            logLabel:Set({Content="turn it off before you make a killer"})
+            logLabel:Set({Content="turn it off before you make a killer(Auto Block)"})
         end
     end)
 end
@@ -258,12 +262,12 @@ mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
                 local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
                 if dist <= blockDistance then
                     doBlock(plr, dist)
+                    break -- ngăn spam nhiều lần khi nhiều killer gần
                 end
             end
         end
     end
 end)
-
 -- Remove animation loop
 task.spawn(function()
     while not unloaded do
