@@ -224,10 +224,28 @@ end)
 -- Auto Block
 local autoBlockEnabled = false
 local blockDistance = 15
+local removeAnimEnabled = false -- toggle xóa animation
+
 local tabBlock = Window:CreateTab("Auto Block", 4483362458)
 local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Nothing"})
-tabBlock:CreateToggle({Name="Enable Auto Block", CurrentValue=autoBlockEnabled, Callback=function(v) autoBlockEnabled=v end})
-tabBlock:CreateSlider({Name="Block Distance (studs)", Range={5,50}, Increment=1, CurrentValue=blockDistance, Callback=function(val) blockDistance=val end})
+
+tabBlock:CreateToggle({
+    Name="Enable Auto Block",
+    CurrentValue=autoBlockEnabled,
+    Callback=function(v) autoBlockEnabled=v end
+})
+tabBlock:CreateSlider({
+    Name="Block Distance (studs)",
+    Range={5,50}, Increment=1,
+    CurrentValue=blockDistance,
+    Callback=function(val) blockDistance=val end
+})
+tabBlock:CreateToggle({
+    Name="Delete Animation Block",
+    CurrentValue=removeAnimEnabled,
+    Callback=function(v) removeAnimEnabled=v end
+})
+
 local function doBlock(plr,dist)
     if unloaded then return end
     pcall(function()
@@ -236,6 +254,7 @@ local function doBlock(plr,dist)
     logLabel:Set({Content="Blocked "..plr.Name.." ("..math.floor(dist).." studs)"})
 end
 
+-- Auto Block loop
 mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
     if unloaded or not autoBlockEnabled then return end
     local myChar = lp.Character
@@ -250,6 +269,23 @@ mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
                 local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
                 if dist <= blockDistance then
                     doBlock(plr, dist)
+                end
+            end
+        end
+    end
+end)
+
+-- Remove animation loop
+task.spawn(function()
+    while not unloaded do
+        task.wait(0.1)
+        if removeAnimEnabled and lp.Character then
+            local humanoid = lp.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                    if track.Animation and tostring(track.Animation.AnimationId):match("134233326423882") then
+                        track:Stop()
+                    end
                 end
             end
         end
@@ -521,18 +557,18 @@ tabGameplay:CreateToggle({
 })
 
 tabGameplay:CreateInput({
-    Name="Custom MaxStamina (0-10000)",
+    Name="Custom MaxStamina (0-999999)",
     PlaceholderText="Nhập số...",
     RemoveTextAfterFocusLost=true,
     Callback=function(text)
         local num = tonumber(text)
-        if num and num>=0 and num<=10000 then
+        if num and num>=0 and num<=999999 then
             customStamina=num
             if keepStaminaEnabled and lp.Character then
                 lp.Character:SetAttribute("MaxStamina",customStamina)
             end
         else
-            warn("Giá trị không hợp lệ (0-10000)")
+            warn("Giá trị không hợp lệ (0-999999)")
         end
     end
 })
@@ -618,37 +654,6 @@ end)
 
 Workspace.GameAssets.Teams.Other.DescendantAdded:Connect(function(desc)
     if AntiWalls then HandleWallPart(desc) end
-end)
-
--- ============================
--- Anti Animation (ID:134233326423882)
--- ============================
-local AntiAnim = false
-local blockedAnimId = "134233326423882"
-
-tabGameplay:CreateToggle({
-    Name="delete animation block",
-    CurrentValue=AntiAnim,
-    Callback=function(v) AntiAnim=v end
-})
-
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if AntiAnim then
-            local char = lp.Character
-            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid:FindFirstChild("Animator") then
-                for _, track in ipairs(humanoid.Animator:GetPlayingAnimationTracks()) do
-                    if track.Animation and tostring(track.Animation.AnimationId):find(blockedAnimId) then
-                        track:Stop()
-                        track:Destroy()
-                        warn("Đã xoá animation bị chặn: "..blockedAnimId)
-                    end
-                end
-            end
-        end
-    end
 end)
 
 -- ============================
