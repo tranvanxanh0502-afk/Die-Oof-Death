@@ -518,7 +518,16 @@ for _, skillName in ipairs(skillList) do
         Increment = 1,
         CurrentValue = 46,
         Callback = function(val)
-            if not buttonConfigs[skillName] t-- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI + AntiAnim + Other Tab)
+            if not buttonConfigs[skillName] then
+                buttonConfigs[skillName] = {size=val,pos={100,100}}
+            else
+                buttonConfigs[skillName].size = val
+            end
+            if enabled then createSkillButton(skillName) end
+        end
+    })
+end
+-- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI + AntiAnim + Other Tab)
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
