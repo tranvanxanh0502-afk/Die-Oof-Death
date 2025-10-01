@@ -222,20 +222,53 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
 local lp = Players.LocalPlayer
 
--- GUI connection
-local Window = MainWindow  -- Connect AutoBlock vào GUI chính
+--// Giả sử Window đã được tạo từ Rayfield chính
+-- Window = Rayfield:CreateWindow(...) từ script chính
 
---// AutoBlock Settings
+-- ================= Delete Block Animation =================
+local removeAnimEnabled = false
+local tabAnim = Window:CreateTab("Auto Block Animation", 4483362458)
+local logLabel = tabAnim:CreateParagraph({
+    Title = "AutoBlock Log",
+    Content = "Delete Block Animation toggle is OFF"
+})
+tabAnim:CreateToggle({
+    Name = "Delete Block (Animation)",
+    CurrentValue = removeAnimEnabled,
+    Callback = function(v)
+        removeAnimEnabled = v
+    end
+})
+
+-- Delete animation loop
+task.spawn(function()
+    while not unloaded do
+        task.wait(0.1)
+        if removeAnimEnabled and lp.Character then
+            local humanoid = lp.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                    if track.Animation and tostring(track.Animation.AnimationId):match("134233326423882") then
+                        track:Stop()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ================= AutoBlock Settings =================
 local BLOCK_DISTANCE = 15
 local watcherEnabled = true
 local Logged = {}
 
---// Remote
+-- Remote
 local UseAbility = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
 
---// Killer Configs
+-- Killer Configs
 local KillerConfigs = {
     ["Pursuer"] = {enabled = true, check = function(_, ws) local valid = {4,6,8,10,12,14,16,20} for _, v in ipairs(valid) do if ws == v then return true end end return false end},
     ["Artful"] = {enabled = true, check = function(_, ws) local valid = {4,8,12,16,20,9,13,17,21} for _, v in ipairs(valid) do if ws == v then return true end end return false end},
@@ -244,7 +277,7 @@ local KillerConfigs = {
     ["Killdroid"] = {enabled = true, check = function(_, ws) local valid = {-4,0,4,12,16,20} for _, v in ipairs(valid) do if ws == v then return true end end return false end}
 }
 
---// Helpers
+-- Helpers
 local function sendBlock()
     UseAbility:InvokeServer("Block")
 end
@@ -292,13 +325,20 @@ local function monitorKiller(killer)
     end
 end
 
---// Monitor existing and new killers
-local killersFolder = workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Killer")
+-- Monitor existing and new killers
+local killersFolder = Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Killer")
 for _, killer in pairs(killersFolder:GetChildren()) do monitorKiller(killer) end
 killersFolder.ChildAdded:Connect(monitorKiller)
 
---// Rayfield GUI Tab AutoBlock
+-- ================= Rayfield GUI Tabs =================
 local tabAutoBlock = Window:CreateTab("AutoBlock", 4483362458)
+for killerName, cfg in pairs(KillerConfigs) do
+    tabAutoBlock:CreateToggle({
+        Name = "Enable "..killerName,
+        CurrentValue = cfg.enabled,
+        Callback = function(val) cfg.enabled = val end
+    })
+end
 tabAutoBlock:CreateSlider({
     Name = "Block Distance",
     Range = {5,50},
@@ -308,17 +348,7 @@ tabAutoBlock:CreateSlider({
     Suffix = "studs"
 })
 
--- Tab Killers
-local tabKillers = Window:CreateTab("Killers", 4483362458)
-for killerName, cfg in pairs(KillerConfigs) do
-    tabKillers:CreateToggle({
-        Name = "Enable "..killerName,
-        CurrentValue = cfg.enabled,
-        Callback = function(val) cfg.enabled = val end
-    })
-end
-
---// Cooldown GUI
+-- Cooldown GUI
 local CooldownGUI = Instance.new("ScreenGui")
 CooldownGUI.Name = "AutoBlockCooldown"
 CooldownGUI.ResetOnSpawn = false
@@ -338,16 +368,16 @@ cooldownLabel.TextScaled = true
 cooldownLabel.Text = "Ready"
 cooldownLabel.Parent = CooldownFrame
 
---// Heartbeat loop
+-- Heartbeat loop
 RunService.Heartbeat:Connect(function()
-    local survivorFolder = workspace:FindFirstChild("GameAssets")
-        and workspace.GameAssets:FindFirstChild("Teams")
-        and workspace.GameAssets.Teams:FindFirstChild("Survivor")
-        and workspace.GameAssets.Teams.Survivor:FindFirstChild(lp.Name)
+    local survivorFolder = Workspace:FindFirstChild("GameAssets")
+        and Workspace.GameAssets:FindFirstChild("Teams")
+        and Workspace.GameAssets.Teams:FindFirstChild("Survivor")
+        and Workspace.GameAssets.Teams.Survivor:FindFirstChild(lp.Name)
 
-    local killersFolderCheck = workspace:FindFirstChild("GameAssets")
-        and workspace.GameAssets:FindFirstChild("Teams")
-        and workspace.GameAssets.Teams:FindFirstChild("Killer")
+    local killersFolderCheck = Workspace:FindFirstChild("GameAssets")
+        and Workspace.GameAssets:FindFirstChild("Teams")
+        and Workspace.GameAssets.Teams:FindFirstChild("Killer")
 
     if killersFolderCheck and lp.Name then
         local inKiller = killersFolderCheck:FindFirstChild(lp.Name) ~= nil
