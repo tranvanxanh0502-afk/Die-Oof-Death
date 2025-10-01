@@ -305,8 +305,8 @@ CooldownGUI.ResetOnSpawn = false
 CooldownGUI.Parent = CoreGui
 
 local CooldownFrame = Instance.new("Frame")
-CooldownFrame.Size = UDim2.new(0,80,0,25)
-CooldownFrame.Position = UDim2.new(1,-10,0,40)
+CooldownFrame.Size = UDim2.new(0,65,0,25)
+CooldownFrame.Position = UDim2.new(1,-5,0,-50)
 CooldownFrame.AnchorPoint = Vector2.new(1,0)
 CooldownFrame.BackgroundTransparency = 1
 CooldownFrame.Parent = CooldownGUI
