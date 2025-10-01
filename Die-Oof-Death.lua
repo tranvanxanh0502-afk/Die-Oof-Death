@@ -299,17 +299,22 @@ local KillerConfigs = {
     },
 
     ["Harken"] = {
-        enabled = true,
-        check = function(playerFolder, ws)
-            local enraged = playerFolder:GetAttribute("Enraged")
-            local seq = enraged and {7.5,13.5,17.5,21.5,25.5} or {4,8,12,16,20}
-            for _, v in ipairs(seq) do
-                if ws == v then return true end
-            end
-            return false
-        end
-    },
+    enabled = true,
+    check = function(playerFolder, ws)
+        local enraged = playerFolder:GetAttribute("Enraged")
+        local seq = enraged and {7.5,13.5,17.5,21.5,25.5} or {4,8,12,16,20}
 
+        -- Nếu AgitationCooldown bật thì block luôn
+        if playerFolder:GetAttribute("AgitationCooldown") then
+            return true
+        end
+
+        for _, v in ipairs(seq) do
+            if ws == v then return true end
+        end
+        return false
+    end
+},
     ["Killdroid"] = {
         enabled = true,
         check = function(_, ws)
