@@ -732,7 +732,7 @@ local function HoldImpl_CheckAttributes()
     local implementCooldown = char:GetAttribute("ImplementCooldown")
 
     if killerName=="Artful" and canTrigger and (implementCooldown==true or (type(implementCooldown)=="number" and implementCooldown>0)) then
-        HoldImpl_holdInAir(2,2.2)
+        HoldImpl_holdInAir(2,2.5)
         canTrigger=false
     end
 
