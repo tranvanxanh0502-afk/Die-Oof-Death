@@ -237,49 +237,90 @@ local Logged = {}
 local UseAbility = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
 
 -- Killer Configs
-local KillerConfigs = {
-    ["Pursuer"] = {enabled = true, check = function(_, ws) local valid = {4,6,8,10,12,14,16,20} for _, v in ipairs(valid) do if ws == v then return true end end return false end},
-    ["Artful"]  = {enabled = true, check = function(_, ws) local valid = {4,8,12,16,20,9,13,17,21} for _, v in ipairs(valid) do if ws == v then return true end end return false end},
-    local badwareState = {
+-- khai báo biến trạng thái bên ngoài
+local badwareState = {
     lastWS = nil,
     lastTime = 0
 }
 
-["Badware"] = {
-    enabled = true,
-    check = function(_, ws)
-        local valid = {4,8,12,16,20}
-        local isValid = false
-        for _, v in ipairs(valid) do
-            if ws == v then
-                isValid = true
-                break
+local KillerConfigs = {
+    ["Pursuer"] = {
+        enabled = true,
+        check = function(_, ws)
+            local valid = {4,6,8,10,12,14,16,20}
+            for _, v in ipairs(valid) do
+                if ws == v then return true end
             end
-        end
-        if not isValid then return false end
-
-        local now = tick()
-        if badwareState.lastWS ~= ws then
-            -- Đổi sang mức mới → reset thời gian
-            badwareState.lastWS = ws
-            badwareState.lastTime = now
             return false
-        else
-            local duration = now - badwareState.lastTime
-            if duration < 0.3 then
-                return true   -- block vì thay đổi quá nhanh
-            elseif duration > 1 then
-                return false  -- không block nếu giữ quá lâu
-            end
         end
-
-        return false
-    end
     },
-    ["Harken"]  = {enabled = true, check = function(playerFolder, ws) local enraged = playerFolder:GetAttribute("Enraged") local seq = enraged and {7.5,13.5,17.5,21.5,25.5} or {4,8,12,16,20} for _, v in ipairs(seq) do if ws == v then return true end end return false end},
-    ["Killdroid"] = {enabled = true, check = function(_, ws) local valid = {-4,0,4,12,16,20} for _, v in ipairs(valid) do if ws == v then return true end end return false end}
-}
 
+    ["Artful"] = {
+        enabled = true,
+        check = function(_, ws)
+            local valid = {4,8,12,16,20,9,13,17,21}
+            for _, v in ipairs(valid) do
+                if ws == v then return true end
+            end
+            return false
+        end
+    },
+
+    ["Badware"] = {
+        enabled = true,
+        check = function(_, ws)
+            local valid = {4,8,12,16,20}
+            local isValid = false
+            for _, v in ipairs(valid) do
+                if ws == v then
+                    isValid = true
+                    break
+                end
+            end
+            if not isValid then return false end
+
+            local now = tick()
+            if badwareState.lastWS ~= ws then
+                -- Đổi sang mức mới → reset thời gian
+                badwareState.lastWS = ws
+                badwareState.lastTime = now
+                return false
+            else
+                local duration = now - badwareState.lastTime
+                if duration < 0.3 then
+                    return true   -- block nếu đổi quá nhanh
+                elseif duration > 1 then
+                    return false  -- không block nếu giữ lâu
+                end
+            end
+
+            return false
+        end
+    },
+
+    ["Harken"] = {
+        enabled = true,
+        check = function(playerFolder, ws)
+            local enraged = playerFolder:GetAttribute("Enraged")
+            local seq = enraged and {7.5,13.5,17.5,21.5,25.5} or {4,8,12,16,20}
+            for _, v in ipairs(seq) do
+                if ws == v then return true end
+            end
+            return false
+        end
+    },
+
+    ["Killdroid"] = {
+        enabled = true,
+        check = function(_, ws)
+            local valid = {-4,0,4,12,16,20}
+            for _, v in ipairs(valid) do
+                if ws == v then return true end
+            end
+            return false
+        end
+    }
+}
 -- Helpers
 local function sendBlock()
     UseAbility:InvokeServer("Block")
