@@ -225,28 +225,14 @@ local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local lp = Players.LocalPlayer
 
---// Giả sử Window đã được tạo từ Rayfield chính
--- Window = Rayfield:CreateWindow(...) từ script chính
+-- Window đã có từ Rayfield chính
+-- Window = Rayfield:CreateWindow(...)
 
 -- ================= Delete Block Animation =================
 local removeAnimEnabled = false
-local tabAnim = Window:CreateTab("Auto Block Animation", 4483362458)
-local logLabel = tabAnim:CreateParagraph({
-    Title = "AutoBlock Log",
-    Content = "Delete Block Animation toggle is OFF"
-})
-tabAnim:CreateToggle({
-    Name = "Delete Block (Animation)",
-    CurrentValue = removeAnimEnabled,
-    Callback = function(v)
-        removeAnimEnabled = v
-    end
-})
 
--- Delete animation loop
 task.spawn(function()
-    while not unloaded do
-        task.wait(0.1)
+    while task.wait(0.1) do
         if removeAnimEnabled and lp.Character then
             local humanoid = lp.Character:FindFirstChildOfClass("Humanoid")
             if humanoid then
@@ -256,6 +242,50 @@ task.spawn(function()
                     end
                 end
             end
+        end
+    end
+end)
+
+-- ================= Cooldown GUI =================
+local showCooldownEnabled = false
+local CooldownGUI = Instance.new("ScreenGui")
+CooldownGUI.Name = "AutoBlockCooldown"
+CooldownGUI.ResetOnSpawn = false
+CooldownGUI.Parent = CoreGui
+CooldownGUI.Enabled = false -- mặc định tắt
+
+local CooldownFrame = Instance.new("Frame")
+CooldownFrame.Size = UDim2.new(0,80,0,25)
+CooldownFrame.Position = UDim2.new(1,-10,1,-50) -- góc phải dưới
+CooldownFrame.AnchorPoint = Vector2.new(1,1)
+CooldownFrame.BackgroundTransparency = 1
+CooldownFrame.Parent = CooldownGUI
+
+local cooldownLabel = Instance.new("TextLabel")
+cooldownLabel.Size = UDim2.new(1,0,1,0)
+cooldownLabel.BackgroundTransparency = 1
+cooldownLabel.TextColor3 = Color3.fromRGB(0,255,0)
+cooldownLabel.Font = Enum.Font.SourceSansBold
+cooldownLabel.TextScaled = true
+cooldownLabel.Text = "Ready"
+cooldownLabel.Parent = CooldownFrame
+
+-- Heartbeat loop cho cooldown hiển thị
+RunService.Heartbeat:Connect(function()
+    if not showCooldownEnabled then return end
+    local survivorFolder = Workspace:FindFirstChild("GameAssets")
+        and Workspace.GameAssets:FindFirstChild("Teams")
+        and Workspace.GameAssets.Teams:FindFirstChild("Survivor")
+        and Workspace.GameAssets.Teams.Survivor:FindFirstChild(lp.Name)
+
+    if survivorFolder then
+        local onCD = survivorFolder:GetAttribute("BlockCooldown")
+        if onCD then
+            cooldownLabel.Text = "On Cooldown"
+            cooldownLabel.TextColor3 = Color3.fromRGB(255,0,0) -- đỏ
+        else
+            cooldownLabel.Text = "Ready"
+            cooldownLabel.TextColor3 = Color3.fromRGB(0,255,0) -- xanh
         end
     end
 end)
@@ -325,13 +355,15 @@ local function monitorKiller(killer)
     end
 end
 
--- Monitor existing and new killers
+-- Monitor killers
 local killersFolder = Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Killer")
 for _, killer in pairs(killersFolder:GetChildren()) do monitorKiller(killer) end
 killersFolder.ChildAdded:Connect(monitorKiller)
 
 -- ================= Rayfield GUI Tabs =================
 local tabAutoBlock = Window:CreateTab("AutoBlock", 4483362458)
+
+-- Killer toggles
 for killerName, cfg in pairs(KillerConfigs) do
     tabAutoBlock:CreateToggle({
         Name = "Enable "..killerName,
@@ -339,6 +371,8 @@ for killerName, cfg in pairs(KillerConfigs) do
         Callback = function(val) cfg.enabled = val end
     })
 end
+
+-- Block distance
 tabAutoBlock:CreateSlider({
     Name = "Block Distance",
     Range = {5,50},
@@ -348,47 +382,22 @@ tabAutoBlock:CreateSlider({
     Suffix = "studs"
 })
 
--- Cooldown GUI
-local CooldownGUI = Instance.new("ScreenGui")
-CooldownGUI.Name = "AutoBlockCooldown"
-CooldownGUI.ResetOnSpawn = false
-CooldownGUI.Parent = CoreGui
-local CooldownFrame = Instance.new("Frame")
-CooldownFrame.Size = UDim2.new(0,60,0,20)
-CooldownFrame.Position = UDim2.new(1,-5,0,-50)
-CooldownFrame.AnchorPoint = Vector2.new(1,0)
-CooldownFrame.BackgroundTransparency = 1
-CooldownFrame.Parent = CooldownGUI
-local cooldownLabel = Instance.new("TextLabel")
-cooldownLabel.Size = UDim2.new(1,0,1,0)
-cooldownLabel.BackgroundTransparency = 1
-cooldownLabel.TextColor3 = Color3.fromRGB(0,255,0)
-cooldownLabel.Font = Enum.Font.SourceSansBold
-cooldownLabel.TextScaled = true
-cooldownLabel.Text = "Ready"
-cooldownLabel.Parent = CooldownFrame
+-- Delete animation toggle
+tabAutoBlock:CreateToggle({
+    Name = "Delete Block (Animation)",
+    CurrentValue = removeAnimEnabled,
+    Callback = function(v) removeAnimEnabled = v end
+})
 
--- Heartbeat loop
-RunService.Heartbeat:Connect(function()
-    local survivorFolder = Workspace:FindFirstChild("GameAssets")
-        and Workspace.GameAssets:FindFirstChild("Teams")
-        and Workspace.GameAssets.Teams:FindFirstChild("Survivor")
-        and Workspace.GameAssets.Teams.Survivor:FindFirstChild(lp.Name)
-
-    local killersFolderCheck = Workspace:FindFirstChild("GameAssets")
-        and Workspace.GameAssets:FindFirstChild("Teams")
-        and Workspace.GameAssets.Teams:FindFirstChild("Killer")
-
-    if killersFolderCheck and lp.Name then
-        local inKiller = killersFolderCheck:FindFirstChild(lp.Name) ~= nil
-        watcherEnabled = not inKiller and (survivorFolder ~= nil)
+-- Show cooldown toggle
+tabAutoBlock:CreateToggle({
+    Name = "Show Cooldown",
+    CurrentValue = showCooldownEnabled,
+    Callback = function(v)
+        showCooldownEnabled = v
+        CooldownGUI.Enabled = v
     end
-
-    if survivorFolder then
-        local onCD = survivorFolder:GetAttribute("BlockCooldown")
-        cooldownLabel.Text = onCD and "On Cooldown" or "Ready"
-    end
-end)
+})
 -- PART 2: Skills & Selector
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
