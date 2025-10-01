@@ -217,15 +217,14 @@ mainConns.charAdded_speed = lp.CharacterAdded:Connect(function(char)
 end)
 
 --// Auto Block+
+--// Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local lp = Players.LocalPlayer
 
---// GUI Rayfield chính
--- Giả sử GUI chính đã load và có biến MainWindow
--- Thay Window bằng MainWindow để gắn tab AutoBlock vào GUI chính
+-- GUI connection
 local Window = MainWindow  -- Connect AutoBlock vào GUI chính
 
 --// AutoBlock Settings
@@ -299,15 +298,8 @@ for _, killer in pairs(killersFolder:GetChildren()) do monitorKiller(killer) end
 killersFolder.ChildAdded:Connect(monitorKiller)
 
 --// Rayfield GUI Tab AutoBlock
-local tabKillers = Window:CreateTab("AutoBlock", 4483362458)
-for killerName, cfg in pairs(KillerConfigs) do
-    tabKillers:CreateToggle({
-        Name = "Enable "..killerName,
-        CurrentValue = cfg.enabled,
-        Callback = function(val) cfg.enabled = val end
-    })
-end
-tabKillers:CreateSlider({
+local tabAutoBlock = Window:CreateTab("AutoBlock", 4483362458)
+tabAutoBlock:CreateSlider({
     Name = "Block Distance",
     Range = {5,50},
     Increment = 1,
@@ -315,6 +307,16 @@ tabKillers:CreateSlider({
     Callback = function(val) BLOCK_DISTANCE = val end,
     Suffix = "studs"
 })
+
+-- Tab Killers
+local tabKillers = Window:CreateTab("Killers", 4483362458)
+for killerName, cfg in pairs(KillerConfigs) do
+    tabKillers:CreateToggle({
+        Name = "Enable "..killerName,
+        CurrentValue = cfg.enabled,
+        Callback = function(val) cfg.enabled = val end
+    })
+end
 
 --// Cooldown GUI
 local CooldownGUI = Instance.new("ScreenGui")
@@ -336,7 +338,7 @@ cooldownLabel.TextScaled = true
 cooldownLabel.Text = "Ready"
 cooldownLabel.Parent = CooldownFrame
 
---// Heartbeat loop để kiểm tra folder Killer/Survivor và cập nhật cooldown
+--// Heartbeat loop
 RunService.Heartbeat:Connect(function()
     local survivorFolder = workspace:FindFirstChild("GameAssets")
         and workspace.GameAssets:FindFirstChild("Teams")
@@ -357,7 +359,6 @@ RunService.Heartbeat:Connect(function()
         cooldownLabel.Text = onCD and "On Cooldown" or "Ready"
     end
 end)
-
 -- PART 2: Skills & Selector
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
