@@ -324,6 +324,7 @@ cooldownLabel.Parent = CooldownFrame
 local tabAutoBlock = Window:CreateTab("AutoBlock", 4483362458)
 
 -- Delete Block (Animation)
+-- Biến toggle
 local removeAnimEnabled = false
 tabAutoBlock:CreateToggle({
     Name = "Delete Block (Animation)",
@@ -332,6 +333,24 @@ tabAutoBlock:CreateToggle({
         removeAnimEnabled = v
     end
 })
+
+-- Vòng lặp xóa animation (gắn với biến removeAnimEnabled)
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if removeAnimEnabled and lp.Character then
+            local humanoid = lp.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                    -- Nếu đúng animation ID thì stop
+                    if track.Animation and tostring(track.Animation.AnimationId):match("134233326423882") then
+                        track:Stop()
+                    end
+                end
+            end
+        end
+    end
+end)
 
 -- Show Cooldown toggle
 local showCooldown = true
