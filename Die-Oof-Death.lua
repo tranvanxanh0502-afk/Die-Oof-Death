@@ -215,17 +215,18 @@ mainConns.charAdded_speed = lp.CharacterAdded:Connect(function(char)
     if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed",walkSpeedValue) end
     if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed",sprintSpeedValue) end
 end)
-
--- ========== Auto Block ==========
+-- ========== Auto Block (Tích hợp script mới) ==========
 local autoBlockEnabled = false
 local blockDistance = 15
 local removeAnimEnabled = false
 local showCooldown = 0
 local coolingDown = false
+local showCooldownEnabled = true
 
 local tabBlock = Window:CreateTab("Auto Block", 4483362458)
 local logLabel = tabBlock:CreateParagraph({Title="AutoBlock Log", Content="Turn off Auto Block(You killer)"})
 
+-- Toggles + slider ban đầu
 tabBlock:CreateToggle({
     Name="Enable Auto Block",
     CurrentValue=autoBlockEnabled,
@@ -242,55 +243,109 @@ tabBlock:CreateToggle({
     CurrentValue=removeAnimEnabled,
     Callback=function(v) removeAnimEnabled=v end
 })
+tabBlock:CreateToggle({
+    Name="Show Cooldown",
+    CurrentValue=showCooldownEnabled,
+    Callback=function(v) showCooldownEnabled=v end
+})
 
-local function doBlock(plr, dist)
-    if unloaded then return end
+-- Killer configs
+local KillerConfigs = {
+    ["Pursuer"] = {valid={4,6,8,10,12,14,16,20}},
+    ["Artful"] = {valid={4,8,12,16,20,9,13,17,21}},
+    ["Badware"] = {valid={4,8,12,16,20,24}},
+    ["Harken"] = {validEnraged={7.5,13.5,17.5,21.5,25.5}, validNormal={4,8,12,16,20}},
+    ["Killdroid"] = {valid={-4,0,4,12,16,20}}
+}
+
+local Logged = {}
+
+local function sendBlock()
     pcall(function()
         if useAbilityRF then useAbilityRF:InvokeServer("Block") end
     end)
+end
+
+local function getWalkSpeedModifier(killer)
+    local val = killer:GetAttribute("WalkSpeedModifier")
+    return val or 0
+end
+
+local function getDistanceFromPlayer(killer)
+    local hrp = killer:FindFirstChild("HumanoidRootPart")
+    local myHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if hrp and myHRP then
+        return (hrp.Position - myHRP.Position).Magnitude
+    end
+    return math.huge
+end
+
+-- Thực hiện block và log + cooldown
+local function doBlock(killer, dist)
+    if not autoBlockEnabled then return end
+    sendBlock()
     if not coolingDown then
         coolingDown = true
         showCooldown = 40
         task.spawn(function()
-            while showCooldown > 0 and not unloaded do
-                logLabel:Set({
-                    Content = ("Blocked %s (%.0f studs) | Cooldown: %ds")
-                        :format(plr.Name, dist, showCooldown)
-                })
+            while showCooldown > 0 do
+                if showCooldownEnabled then
+                    logLabel:Set({Content = ("Blocked %s (%.0f studs) | Cooldown: %ds"):format(killer.Name, dist, showCooldown)})
+                end
                 task.wait(1)
                 showCooldown -= 1
             end
-            if not unloaded then
-                logLabel:Set({Content = "Turn off Auto Block(You killer)"})
-            end
+            logLabel:Set({Content="Turn off Auto Block(You killer)"})
             coolingDown = false
         end)
     end
 end
 
-mainConns.autoBlockHB = RunService.Heartbeat:Connect(function()
-    if unloaded or not autoBlockEnabled then return end
-    local myChar = lp.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return end
-    local myPos = myHRP.Position
+-- Kiểm tra và block theo WalkSpeedModifier
+local function checkKiller(killer)
+    if not autoBlockEnabled or not killer then return end
+    local name = killer:GetAttribute("KillerName")
+    if not name or not KillerConfigs[name] then return end
 
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local teamName = plr.Character.Parent and plr.Character.Parent.Name
-            if teamName == "Killer" then
-                local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
-                if dist <= blockDistance then
-                    doBlock(plr, dist)
-                end
+    local ws = getWalkSpeedModifier(killer)
+    local dist = getDistanceFromPlayer(killer)
+    if dist > blockDistance then return end
+
+    local cfg = KillerConfigs[name]
+    local valid = cfg.valid
+    if name == "Harken" then
+        local enraged = killer:GetAttribute("Enraged")
+        valid = enraged and cfg.validEnraged or cfg.validNormal
+    end
+
+    for _, v in ipairs(valid) do
+        if ws == v then
+            if not Logged[killer] then Logged[killer] = {} end
+            if not Logged[killer][ws] then
+                doBlock(killer, dist)
+                Logged[killer][ws] = true
+                task.delay(3, function() Logged[killer][ws] = nil end)
             end
+            break
+        end
+    end
+end
+
+-- Kết nối heartbeat
+RunService.Heartbeat:Connect(function()
+    if not autoBlockEnabled then return end
+    local myHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+    for _, killer in ipairs(workspace.GameAssets.Teams.Killer:GetChildren()) do
+        if killer:FindFirstChild("HumanoidRootPart") then
+            checkKiller(killer)
         end
     end
 end)
 
+-- Xóa animation nếu bật
 task.spawn(function()
-    while not unloaded do
-        task.wait(0.1)
+    while task.wait(0.1) do
         if removeAnimEnabled and lp.Character then
             local humanoid = lp.Character:FindFirstChildOfClass("Humanoid")
             if humanoid then
