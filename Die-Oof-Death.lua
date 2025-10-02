@@ -238,9 +238,11 @@ local UseAbility = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Remote
 
 -- Killer Configs
 -- khai báo biến trạng thái bên ngoài
+-- Biến trạng thái riêng cho Badware
 local badwareState = {
-    lastWS = nil,
-    lastTime = 0
+    active = false,
+    startTime = 0,
+    lastWS = nil
 }
 
 local KillerConfigs = {
@@ -266,38 +268,7 @@ local KillerConfigs = {
         end
     },
 
-    ["Badware"] = {
-        enabled = true,
-        check = function(_, ws)
-            local valid = {4,7,8,12,16,20}
-            local isValid = false
-            for _, v in ipairs(valid) do
-                if ws == v then
-                    isValid = true
-                    break
-                end
-            end
-            if not isValid then return false end
-
-            local now = tick()
-            if badwareState.lastWS ~= ws then
-                -- Đổi sang mức mới → reset thời gian
-                badwareState.lastWS = ws
-                badwareState.lastTime = now
-                return false
-            else
-                local duration = now - badwareState.lastTime
-                if duration < 0.25 then
-                    return true   -- block nếu đổi quá nhanh
-                elseif duration > 0.29 then
-                    return false  -- không block nếu giữ lâu
-                end
-            end
-
-            return false
-        end
-    },
-
+    
     ["Harken"] = {
     enabled = true,
     check = function(playerFolder, ws)
@@ -311,6 +282,48 @@ local KillerConfigs = {
 
         for _, v in ipairs(seq) do
             if ws == v then return true end
+        end
+        return false
+    end
+},
+    ["Badware"] = {
+    enabled = true,
+    check = function(_, ws)
+        local valid = {4,8,12,16,20}
+        local function isValid(val)
+            for _, v in ipairs(valid) do
+                if val == v then return true end
+            end
+            return false
+        end
+
+        local now = tick()
+        if isValid(ws) then
+            -- Nếu bắt đầu theo dõi
+            if not badwareState.active then
+                badwareState.startTime = now
+                badwareState.active = true
+                badwareState.lastWS = ws
+                return false
+            else
+                -- Nếu đổi từ giá trị hợp lệ này sang giá trị hợp lệ khác -> tiếp tục, không reset
+                badwareState.lastWS = ws
+                return false
+            end
+        else
+            -- Nếu đang active mà bị tụt ra ngoài dãy hợp lệ
+            if badwareState.active then
+                local duration = now - badwareState.startTime
+                badwareState.active = false
+                badwareState.lastWS = nil
+                badwareState.startTime = nil
+
+                if duration < 0.3 then
+                    return true   -- block vì tụt quá sớm
+                else
+                    return false  -- không block vì giữ đủ lâu
+                end
+            end
         end
         return false
     end
