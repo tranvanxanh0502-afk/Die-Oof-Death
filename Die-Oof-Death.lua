@@ -287,9 +287,9 @@ local KillerConfigs = {
                 return false
             else
                 local duration = now - badwareState.lastTime
-                if duration < 0.15 then
+                if duration < 0.1 then
                     return true   -- block nếu đổi quá nhanh
-                elseif duration > 1 then
+                elseif duration > 0.3 then
                     return false  -- không block nếu giữ lâu
                 end
             end
