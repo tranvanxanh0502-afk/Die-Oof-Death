@@ -247,7 +247,7 @@ local KillerConfigs = {
     ["Pursuer"] = {
         enabled = true,
         check = function(_, ws)
-            local valid = {4,6,8,10,12,14,16,20}
+            local valid = {4,6,7,8,10,12,14,16,20}
             for _, v in ipairs(valid) do
                 if ws == v then return true end
             end
@@ -258,7 +258,7 @@ local KillerConfigs = {
     ["Artful"] = {
         enabled = true,
         check = function(_, ws)
-            local valid = {4,8,12,16,20,9,13,17,21}
+            local valid = {4,7,8,12,16,20,9,13,17,21}
             for _, v in ipairs(valid) do
                 if ws == v then return true end
             end
@@ -269,7 +269,7 @@ local KillerConfigs = {
     ["Badware"] = {
         enabled = true,
         check = function(_, ws)
-            local valid = {4,8,12,16,20}
+            local valid = {4,7,8,12,16,20}
             local isValid = false
             for _, v in ipairs(valid) do
                 if ws == v then
@@ -287,7 +287,7 @@ local KillerConfigs = {
                 return false
             else
                 local duration = now - badwareState.lastTime
-                if duration < 0.3 then
+                if duration < 0.15 then
                     return true   -- block nếu đổi quá nhanh
                 elseif duration > 1 then
                     return false  -- không block nếu giữ lâu
@@ -302,7 +302,7 @@ local KillerConfigs = {
     enabled = true,
     check = function(playerFolder, ws)
         local enraged = playerFolder:GetAttribute("Enraged")
-        local seq = enraged and {7.5,13.5,17.5,21.5,25.5} or {4,8,12,16,20}
+        local seq = enraged and {7.5,10,5,13.5,17.5,21.5,25.5} or {4,7,8,12,16,20}
 
         -- Nếu AgitationCooldown bật thì block luôn
         if playerFolder:GetAttribute("AgitationCooldown") then
