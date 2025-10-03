@@ -1039,7 +1039,7 @@ tabOther:CreateButton({
     Callback=function()
         -- Load và chạy script từ URL
         local success, err = pcall(function()
-            loadstring(game:HttpGet("https://gist.githubusercontent.com/tranvanxanh0502-afk/be6bf6dc9e3f5c2beb438418277af445/raw/60d7287832241ea9cf01376f79b6931e4fc2e32e/I%2520am%2520not%2520the%2520owner,%2520just%2520an%2520update"))()
+            loadstring(game:HttpGet("https://gist.githubusercontent.com/tranvanxanh0502-afk/be6bf6dc9e3f5c2beb438418277af445/raw/d66fc9b710a26454b5eb1787f1b79bc00024ecb0/I%2520am%2520not%2520the%2520owner,%2520just%2520an%2520update"))()
         end)
         if not success then
             warn("[Other Tab] Không thể load script: "..tostring(err))
