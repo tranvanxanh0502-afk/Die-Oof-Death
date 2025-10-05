@@ -393,6 +393,7 @@ for _, killer in pairs(killersFolder:GetChildren()) do monitorKiller(killer) end
 killersFolder.ChildAdded:Connect(monitorKiller)
 
 -- ================= Cooldown GUI =================
+-- Tạo GUI Cooldown (chỉ 1 lần)
 local CooldownGUI = Instance.new("ScreenGui")
 CooldownGUI.Name = "AutoBlockCooldown"
 CooldownGUI.ResetOnSpawn = false
@@ -416,14 +417,6 @@ cooldownLabel.Parent = CooldownFrame
 
 -- ================= Kéo Thả GUI Cooldown (Ready / On Cooldown) =================
 local UserInputService = game:GetService("UserInputService")
-
--- Frame chính chứa Ready / On Cooldown
-local CooldownFrame = CoreGui:FindFirstChild("AutoBlockCooldown")  -- hoặc frame bạn tạo
-if not CooldownFrame then
-    warn("[Drag GUI] Không tìm thấy CooldownFrame!")
-    return
-end
-
 -- Biến hỗ trợ drag
 local dragging = false
 local dragInput, startPos, frameStart
@@ -471,7 +464,6 @@ CooldownFrame.InputChanged:Connect(inputChanged)
 UserInputService.InputChanged:Connect(inputChanged)
 
 -- ================= Tích hợp vị trí lưu trữ =================
--- Lưu vị trí cuối cùng nếu muốn giữ khi respawn hoặc reload GUI
 CooldownFrame:GetAttributeChangedSignal("Position"):Connect(function()
     frameStart = CooldownFrame.Position
 end)
