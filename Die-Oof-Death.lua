@@ -411,177 +411,209 @@ end)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local lp = Players.LocalPlayer
-
---// Giả sử Window đã được tạo từ Rayfield chính
--- local Window = MainWindow
 
 -- ================= AutoBlock Settings =================
 local BLOCK_DISTANCE = 15
 local watcherEnabled = true
-local Logged = {}
+local Logged = {}  -- Cleanup tự động
 
 -- Remote
 local UseAbility = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
-
--- Killer Configs
--- khai báo biến trạng thái bên ngoài
--- Biến trạng thái riêng cho Badware
-local badwareState = {
-    active = false,
-    startTime = 0,
-    lastWS = nil
-}
 
 local KillerConfigs = {
     ["Pursuer"] = {
         enabled = true,
         check = function(_, ws)
             local valid = {4,6,7,8,10,12,14,16,20}
-            for _, v in ipairs(valid) do
-                if ws == v then return true end
-            end
+            for _, v in ipairs(valid) do if ws == v then return true end end
             return false
         end
     },
-
     ["Artful"] = {
         enabled = true,
         check = function(_, ws)
             local valid = {4,7,8,12,16,20,9,13,17,21}
-            for _, v in ipairs(valid) do
-                if ws == v then return true end
-            end
+            for _, v in ipairs(valid) do if ws == v then return true end end
             return false
         end
     },
-
-    
     ["Harken"] = {
-    enabled = true,
-    check = function(playerFolder, ws)
-        local enraged = playerFolder:GetAttribute("Enraged")
-        local seq = enraged and {7.5,10,5,13.5,17.5,21.5,25.5} or {4,7,8,12,16,20}
-
-        -- Nếu AgitationCooldown bật thì block luôn
-        if playerFolder:GetAttribute("AgitationCooldown") then
-            return true
-        end
-
-        for _, v in ipairs(seq) do
-            if ws == v then return true end
-        end
-        return false
-    end
-},
-    ["Badware"] = {
-    enabled = true,
-    check = function(_, ws)
-        local valid = {4,8,12,16,20}
-        local function isValid(val)
-            for _, v in ipairs(valid) do
-                if val == v then return true end
-            end
+        enabled = true,
+        check = function(playerFolder, ws)
+            local enraged = playerFolder:GetAttribute("Enraged")
+            local seq = enraged and {7.5,10,5,13.5,17.5,21.5,25.5} or {4,7,8,12,16,20}
+            if playerFolder:GetAttribute("AgitationCooldown") then return true end
+            for _, v in ipairs(seq) do if ws == v then return true end end
             return false
         end
-
-        local now = tick()
-        if isValid(ws) then
-            -- Nếu bắt đầu theo dõi
-            if not badwareState.active then
-                badwareState.startTime = now
-                badwareState.active = true
-                badwareState.lastWS = ws
-                return false
-            else
-                -- Nếu đổi từ giá trị hợp lệ này sang giá trị hợp lệ khác -> tiếp tục, không reset
-                badwareState.lastWS = ws
-                return false
-            end
-        else
-            -- Nếu đang active mà bị tụt ra ngoài dãy hợp lệ
-            if badwareState.active then
-                local duration = now - badwareState.startTime
-                badwareState.active = false
-                badwareState.lastWS = nil
-                badwareState.startTime = nil
-
-                if duration < 0.3 then
-                    return true   -- block vì tụt quá sớm
-                else
-                    return false  -- không block vì giữ đủ lâu
-                end
-            end
+    },
+    ["Badware"] = {
+        enabled = true,
+        check = function(_, ws)
+            local valid = {4,8,12,16,20}
+            for _, v in ipairs(valid) do if ws == v then return true end end
+            return false  -- Out ws = block (attack/speed up, poll nhanh detect burst)
         end
-        return false
-    end
-},
+    },
     ["Killdroid"] = {
         enabled = true,
         check = function(_, ws)
             local valid = {-4,0,4,12,16,20}
-            for _, v in ipairs(valid) do
-                if ws == v then return true end
-            end
+            for _, v in ipairs(valid) do if ws == v then return true end end
             return false
         end
     }
 }
--- Helpers
-local function sendBlock()
-    UseAbility:InvokeServer("Block")
+
+-- Cache cho low latency + smooth
+local cache = {}  -- [killer] = {ws=0, dist=math.huge, time=0, humanoid=nil}
+local CACHE_TIME = 0.1  -- Update cache mỗi 100ms
+
+-- Per-killer debounce + async spam block
+local lastBlockPerKiller = {}  -- [killer] = lastTime
+local DEBOUNCE_TIME = 0.05  -- 50ms: Spam mượt ~20 blocks/s
+
+local function sendBlock(killer)
+    local now = tick()
+    local lastTime = lastBlockPerKiller[killer] or 0
+    if now - lastTime < DEBOUNCE_TIME then return end
+    lastBlockPerKiller[killer] = now
+    
+    -- Async Invoke (low latency, không block main thread)
+    task.spawn(function()
+        pcall(function() UseAbility:InvokeServer("Block") end)
+    end)
 end
 
 local function getWalkSpeedModifier(killer)
-    return killer:GetAttribute("WalkSpeedModifier") or 0
+    local now = tick()
+    local c = cache[killer]
+    if c and now - c.time < CACHE_TIME then return c.ws end
+    local ws = killer:GetAttribute("WalkSpeedModifier") or 0
+    if not c then c = {} end
+    c.ws = ws
+    c.time = now
+    cache[killer] = c
+    return ws
 end
 
 local function getDistanceFromPlayer(killer)
-    if killer:FindFirstChild("HumanoidRootPart") and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
-        return (killer.HumanoidRootPart.Position - lp.Character.HumanoidRootPart.Position).Magnitude
+    local now = tick()
+    local c = cache[killer]
+    if c and now - c.time < CACHE_TIME then return c.dist end
+    local killerHRP = killer:FindFirstChild("HumanoidRootPart")
+    local lpHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    local dist = math.huge
+    if killerHRP and lpHRP then
+        dist = (killerHRP.Position - lpHRP.Position).Magnitude
     end
-    return math.huge
+    if not c then c = {} end
+    c.dist = dist
+    c.time = now
+    cache[killer] = c
+    return dist
+end
+
+local function getHumanoidHealth(killer)
+    local now = tick()
+    local c = cache[killer]
+    if c and now - c.time < CACHE_TIME and c.humanoid then
+        return c.humanoid.Health > 0
+    end
+    local humanoid = killer:FindFirstChildOfClass("Humanoid")
+    local alive = humanoid and humanoid.Health > 0
+    if c then c.humanoid = humanoid end
+    return alive
 end
 
 local function checkAndBlock(killer)
-    if not watcherEnabled or not killer then return end
+    if not watcherEnabled or not killer or getDistanceFromPlayer(killer) > BLOCK_DISTANCE or not getHumanoidHealth(killer) then return end
     local ws = getWalkSpeedModifier(killer)
     local name = killer:GetAttribute("KillerName")
     if not name then return end
     local config = KillerConfigs[name]
     if not config or not config.enabled then return end
-    if getDistanceFromPlayer(killer) > BLOCK_DISTANCE then return end
     if config.check(killer, ws) then
-        sendBlock()
+        sendBlock(killer)
+        -- Log với cleanup (smooth memory)
         Logged[killer] = Logged[killer] or {}
-        if not Logged[killer][ws] then
-            print("[AutoBlock] "..name.." ("..killer.Name..") WalkSpeedModifier = "..ws.." -> blocked")
-            Logged[killer][ws] = true
-            task.delay(3, function() Logged[killer][ws] = nil end)
+        local logKey = tostring(ws) .. "_" .. now
+        if not Logged[killer][logKey] then
+            print("[AutoBlock] "..name.." ("..killer.Name..") ws="..ws.." -> blocked")
+            Logged[killer][logKey] = true
+            task.delay(3, function() if Logged[killer] then Logged[killer][logKey] = nil end end)
         end
     end
 end
 
-local function monitorKiller(killer)
-    if not killer then return end
-    checkAndBlock(killer)
-    if not killer:GetAttribute("__AB_CONNECTED") then
-        killer:SetAttribute("__AB_CONNECTED", true)
-        killer.AttributeChanged:Connect(function(attr)
-            if attr == "WalkSpeedModifier" or attr == "KillerName" or attr == "Enraged" then
-                checkAndBlock(killer)
-            end
-        end)
-    end
+-- Low-latency poll cho tất cả killers (mượt: chỉ khi gần)
+local killerPolls = {}  -- [killer] = connection
+
+local function startKillerPoll(killer)
+    if killerPolls[killer] then return end
+    killerPolls[killer] = RunService.Heartbeat:Connect(function()
+        if unloaded or not watcherEnabled then
+            stopKillerPoll(killer)
+            return
+        end
+        if getDistanceFromPlayer(killer) > BLOCK_DISTANCE or not getHumanoidHealth(killer) then
+            return  -- Không poll nếu xa/dead (smooth CPU)
+        end
+        checkAndBlock(killer)  -- Poll ws/dist mỗi frame → low latency
+    end)
 end
 
--- Monitor existing and new killers
+local function stopKillerPoll(killer)
+    if killerPolls[killer] then
+        killerPolls[killer]:Disconnect()
+        killerPolls[killer] = nil
+    end
+    lastBlockPerKiller[killer] = nil
+    cache[killer] = nil
+    Logged[killer] = nil
+end
+
+local function monitorKiller(killer)
+    if not killer or killer:GetAttribute("__AB_CONNECTED") then return end
+    killer:SetAttribute("__AB_CONNECTED", true)
+    
+    -- Attribute event (initial + fast trigger)
+    local attrConn = killer.AttributeChanged:Connect(function(attr)
+        if unloaded or not watcherEnabled then return end
+        if attr == "WalkSpeedModifier" or attr == "KillerName" or attr == "Enraged" or attr == "AgitationCooldown" then
+            startKillerPoll(killer)  -- Bật poll ngay khi change
+            checkAndBlock(killer)  -- Block instant
+        end
+    end)
+    
+    -- Cleanup khi killer gone (smooth no leak)
+    local ancestryConn = killer.AncestryChanged:Connect(function()
+        if not killer.Parent then
+            stopKillerPoll(killer)
+            pcall(function() attrConn:Disconnect() end)
+            pcall(function() ancestryConn:Disconnect() end)
+        end
+    end)
+    
+    startKillerPoll(killer)  -- Initial poll
+    checkAndBlock(killer)
+end
+
+-- Monitor killers
 local killersFolder = Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Killer")
 for _, killer in pairs(killersFolder:GetChildren()) do monitorKiller(killer) end
 killersFolder.ChildAdded:Connect(monitorKiller)
 
+-- UI Toggle (nếu có Window từ Rayfield)
+-- local autoBlockTab = Window:CreateTab("AutoBlock", 4483362458)
+-- autoBlockTab:CreateToggle({Name="Enable AutoBlock", CurrentValue=true, Callback=function(v) watcherEnabled = v end})
+-- autoBlockTab:CreateSlider({Name="Block Distance", Range={5,30}, Increment=1, CurrentValue=BLOCK_DISTANCE, Callback=function(v) BLOCK_DISTANCE = v end})
+
+-- Global cleanup (thêm vào unloadScript trước)
+-- for killer, _ in pairs(killerPolls) do stopKillerPoll(killer) end
+-- cache = {}; Logged = {}; lastBlockPerKiller = {}      
 -- ================= Cooldown GUI =================
 -- Tạo GUI Cooldown (chỉ 1 lần)
 local CooldownGUI = Instance.new("ScreenGui")
