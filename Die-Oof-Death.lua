@@ -925,24 +925,64 @@ local function cleanupSkill(skillName)
     end
     lastUsed[skillName] = nil
 end
-       -- Make GUI draggable (fixed: no origClick error, scoped + global move)
-local UserInputService = game:GetService("UserInputService")
+-- Make hold
+    local UserInputService = game:GetService("UserInputService")
 
 local function makeDraggable(frame, skillName)
     local cfg = buttonConfigs[skillName]
     if not cfg then return end
-    
+
+    frame.Active = true
+    frame.ZIndex = 10
+    for _, child in ipairs(frame:GetDescendants()) do
+        if child:IsA("GuiObject") then
+            child.ZIndex = 10
+            if child:IsA("TextButton") then child.Active = true end
+        end
+    end
+
     local dragging = false
-    local dragStart = nil
-    local startPos = nil
-    local moveConnection = nil  -- UIS move conn
-    local endConnection = nil   -- UIS end conn
-    local connections = {}
+    local dragStart
+    local startPos
 
     local function update(input)
         local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                   startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
+
+    local function onInputBegan(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    cfg.pos = {frame.Position.X.Offset, frame.Position.Y.Offset}
+                end
+            end)
+        end
+    end
+
+    local function onInputChanged(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
+                         input.UserInputType == Enum.UserInputType.Touch) then
+            update(input)
+        end
+    end
+
+    -- Connect frame + descendants
+    frame.InputBegan:Connect(onInputBegan)
+    frame.InputChanged:Connect(onInputChanged)
+    for _, child in ipairs(frame:GetDescendants()) do
+        if child:IsA("GuiObject") then
+            child.InputBegan:Connect(onInputBegan)
+            child.InputChanged:Connect(onInputChanged)
+        end
+    end
+end
 
     -- Start drag: Scoped to frame/descendants
     local function onInputBegan(input)
