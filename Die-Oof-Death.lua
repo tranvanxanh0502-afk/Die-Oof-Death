@@ -764,10 +764,13 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+
 -- PART 2: Skills & Selector
--- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part1)
+-- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part 1)
 local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
-local lp = lp or game:GetService("Players").LocalPlayer
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local lp = Players.LocalPlayer
 
 local skillList = {"Revolver","Punch","Block","Caretaker","Hotdog","Taunt","Cloak","Dash","Banana","BonusPad","Adrenaline"}
 local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
@@ -817,16 +820,35 @@ guiStorage.ResetOnSpawn = false
 guiStorage.IgnoreGuiInset = true
 guiStorage.Parent = lp:WaitForChild("PlayerGui")
 
-local buttonConfigs = {} -- [skillName] = {size,pos}
+local buttonConfigs = {} -- [skillName] = {size=46, pos={100,100}, frame=nil, connections={}}
 local lastUsed = {}      -- [skillName] = os.clock()
 
--- Make GUI draggable
+-- Cleanup function
+local function cleanupSkill(skillName)
+    local cfg = buttonConfigs[skillName]
+    if cfg and cfg.frame then
+        for _, conn in pairs(cfg.connections or {}) do
+            if typeof(conn) == "RBXScriptConnection" then
+                pcall(function() conn:Disconnect() end)
+            end
+        end
+        cfg.frame:Destroy()
+        cfg.frame = nil
+        cfg.connections = {}
+    end
+    lastUsed[skillName] = nil
+end
+
+-- Make GUI draggable (optimized: chỉ connect cần thiết)
 local function makeDraggable(frame, skillName)
+    local cfg = buttonConfigs[skillName]
+    if not cfg then return end
     local dragging, dragStart, startPos = false, Vector2.new(), frame.Position
+    local connections = {}
 
     local function update(input)
         local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 
     local function onInputBegan(input)
@@ -834,50 +856,58 @@ local function makeDraggable(frame, skillName)
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
-            input.Changed:Connect(function()
+            local endConn = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
-                    buttonConfigs[skillName].pos = {frame.Position.X.Offset, frame.Position.Y.Offset}
+                    cfg.pos = {frame.Position.X.Offset, frame.Position.Y.Offset}
+                    endConn:Disconnect()
                 end
             end)
+            table.insert(connections, endConn)
         end
     end
 
     local function onInputChanged(input)
-        if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             update(input)
         end
     end
 
-    frame.InputBegan:Connect(onInputBegan)
-    frame.InputChanged:Connect(onInputChanged)
+    local dragBeganConn = frame.InputBegan:Connect(onInputBegan)
+    local dragChangedConn = frame.InputChanged:Connect(onInputChanged)
+    table.insert(connections, dragBeganConn, dragChangedConn)  -- Không connect descendants để giảm leak
 
-    for _, child in ipairs(frame:GetDescendants()) do
-        if child:IsA("GuiObject") then
-            child.InputBegan:Connect(onInputBegan)
-            child.InputChanged:Connect(onInputChanged)
-        end
-    end
+    cfg.connections.drag = connections
 end
 
--- Create skill button
+-- Create skill button (chỉ tạo 1 lần, reuse sau)
 local function createSkillButton(skillName)
     local skillData = SkillsModule[skillName]
     if not skillData then return end
 
-    local cfg = buttonConfigs[skillName] or {size=46,pos={100,100}}
+    local cfg = buttonConfigs[skillName] or {size=46, pos={100,100}, frame=nil, connections={}}
     buttonConfigs[skillName] = cfg
 
-    local old = guiStorage:FindFirstChild(skillName.."_Btn")
-    if old then old:Destroy() end
+    -- Nếu đã tồn tại, chỉ show + resize/pos
+    if cfg.frame then
+        cfg.frame.Visible = true
+        cfg.frame.Size = UDim2.new(0, cfg.size, 0, cfg.size)
+        cfg.frame.Position = UDim2.new(0, cfg.pos[1], 0, cfg.pos[2])
+        return cfg.frame
+    end
 
-    -- Frame & visuals
+    -- Cleanup cũ nếu có
+    cleanupSkill(skillName)
+
+    -- Tạo mới
     local btnFrame = Instance.new("Frame")
     btnFrame.Name = skillName.."_Btn"
-    btnFrame.Size = UDim2.new(0,cfg.size,0,cfg.size)
-    btnFrame.Position = UDim2.new(0,cfg.pos[1],0,cfg.pos[2])
+    btnFrame.Size = UDim2.new(0, cfg.size, 0, cfg.size)
+    btnFrame.Position = UDim2.new(0, cfg.pos[1], 0, cfg.pos[2])
     btnFrame.BackgroundTransparency = 1
+    btnFrame.Visible = true
     btnFrame.Parent = guiStorage
+    cfg.frame = btnFrame
 
     local border = Instance.new("UIStroke")
     border.Thickness = 2
@@ -901,6 +931,7 @@ local function createSkillButton(skillName)
     icon.Parent = innerFrame
 
     local cooldownOverlay = Instance.new("Frame")
+    cooldownOverlay.Name = "CooldownOverlay"
     cooldownOverlay.Size = UDim2.new(1,0,1,0)
     cooldownOverlay.BackgroundColor3 = Color3.fromRGB(0,0,0)
     cooldownOverlay.BackgroundTransparency = 0.6
@@ -908,57 +939,52 @@ local function createSkillButton(skillName)
     cooldownOverlay.Visible = false
     cooldownOverlay.Parent = innerFrame
 
-    local cdLabel = Instance.new("TextLabel")
-    cdLabel.Size = UDim2.new(1,0,1,0)
-    cdLabel.BackgroundTransparency = 1
-    cdLabel.TextColor3 = Color3.fromRGB(255,255,255)
-    cdLabel.TextScaled = true
-    cdLabel.Font = Enum.Font.GothamBold
-    cdLabel.Visible = false
-    cdLabel.Parent = cooldownOverlay
-
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1,0,1,0)
     button.BackgroundTransparency = 1
     button.Text = ""
     button.Parent = innerFrame
 
-    -- Button click
-    button.MouseButton1Click:Connect(function()
+    -- Button click với smooth cooldown (Tween thay loop)
+    local clickConn
+    clickConn = button.MouseButton1Click:Connect(function()
         local cooldown = tonumber(skillData.Cooldown) or 1
         local now = os.clock()
         if not lastUsed[skillName] or now - lastUsed[skillName] >= cooldown then
             lastUsed[skillName] = now
             local remoteFunc = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
             pcall(function() remoteFunc:InvokeServer(skillName) end)
-            cooldownOverlay.Visible = true
-            cdLabel.Visible = true
 
-            task.spawn(function()
-                local t = cooldown
-                while t > 0 do
-                    cdLabel.Text = tostring(math.ceil(t))
-                    task.wait(1)
-                    t -= 1
-                end
+            -- Smooth cooldown với Tween (scale overlay từ 0 -> 1 theo thời gian)
+            cooldownOverlay.Size = UDim2.new(1,0,0,0)  -- Start empty
+            cooldownOverlay.Visible = true
+            local tweenInfo = TweenInfo.new(cooldown, Enum.EasingStyle.Linear)
+            local tween = TweenService:Create(cooldownOverlay, tweenInfo, {Size = UDim2.new(1,0,1,0)})
+            tween:Play()
+            tween.Completed:Connect(function()
                 cooldownOverlay.Visible = false
-                cdLabel.Visible = false
             end)
+            table.insert(cfg.connections, clickConn)  -- Lưu để cleanup
         end
     end)
+    table.insert(cfg.connections, clickConn)
 
     makeDraggable(btnFrame, skillName)
+    return btnFrame
 end
 
--- Remove skill button
-local function removeSkillButton(skillName)
-    local old = guiStorage:FindFirstChild(skillName.."_Btn")
-    if old then old:Destroy() end
+-- Hide skill button (reuse, không destroy)
+local function hideSkillButton(skillName)
+    local cfg = buttonConfigs[skillName]
+    if cfg and cfg.frame then
+        cfg.frame.Visible = false
+    end
 end
 
--- Create toggles + sliders for each skill
+-- Toggles + sliders for each skill
 for _, skillName in ipairs(skillList) do
     local enabled = false
+    local lastSize = 46  -- Debounce size
 
     tabSkills:CreateToggle({
         Name = "Enable "..skillName,
@@ -968,7 +994,7 @@ for _, skillName in ipairs(skillList) do
             if v then
                 createSkillButton(skillName)
             else
-                removeSkillButton(skillName)
+                hideSkillButton(skillName)  -- Chỉ hide, không destroy
             end
         end
     })
@@ -979,16 +1005,32 @@ for _, skillName in ipairs(skillList) do
         Increment = 1,
         CurrentValue = 46,
         Callback = function(val)
-            if not buttonConfigs[skillName] then
-                buttonConfigs[skillName] = {size=val,pos={100,100}}
-            else
-                buttonConfigs[skillName].size = val
+            local cfg = buttonConfigs[skillName]
+            if not cfg then return end
+            if math.abs(val - lastSize) < 5 then return end  -- Debounce: chỉ update nếu thay đổi >5
+            lastSize = val
+            cfg.size = val
+            if enabled then
+                local frame = cfg.frame
+                if frame then
+                    frame.Size = UDim2.new(0, val, 0, val)
+                else
+                    createSkillButton(skillName)  -- Fallback nếu chưa có
+                end
             end
-            if enabled then createSkillButton(skillName) end
         end
     })
 end
 
+-- Global cleanup (gọi khi unload script)
+local function cleanupAllSkills()
+    for skillName, _ in pairs(buttonConfigs) do
+        cleanupSkill(skillName)
+    end
+    buttonConfigs = {}
+    lastUsed = {}
+end
+-- mainConns.skillsCleanup = ... (nếu có unload event, gọi cleanupAllSkills())
 -- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI + AntiAnim + Other Tab)
 
 local RunService = game:GetService("RunService")
