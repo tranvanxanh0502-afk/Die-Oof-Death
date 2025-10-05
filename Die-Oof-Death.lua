@@ -397,7 +397,7 @@ killersFolder.ChildAdded:Connect(monitorKiller)
 local CooldownGUI = Instance.new("ScreenGui")
 CooldownGUI.Name = "AutoBlockCooldown"
 CooldownGUI.ResetOnSpawn = false
-CooldownGUI.Parent = CoreGui
+CooldownGUI.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 
 local CooldownFrame = Instance.new("Frame")
 CooldownFrame.Size = UDim2.new(0,65,0,25)
@@ -1085,7 +1085,7 @@ tabSettings:CreateButton({
 -- ============================
 -- Tab Animation (Change Animation)
 -- ============================
-local animationTab = Window:CreateTab("Animation")
+local animationTab = Window:CreateTab("Animation, 4483362458")
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
