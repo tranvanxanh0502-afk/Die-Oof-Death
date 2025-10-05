@@ -296,6 +296,61 @@ for teamName, cfg in pairs(espConfigs) do
         end
     })
 end
+-- ========== Auto-Detect & Fix ESP (Mobile Resume Fix) ==========
+local UserInputService = game:GetService("UserInputService")
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+local lastEspCheck = 0
+local ESP_CHECK_INTERVAL = 3  -- 3 giây (thấp lag)
+
+task.spawn(function()
+    while not unloaded do
+        local now = tick()
+        if now - lastEspCheck < ESP_CHECK_INTERVAL then
+            task.wait(0.1)
+            continue
+        end
+        lastEspCheck = now
+        
+        -- Chỉ poll trên mobile hoặc nếu enabled
+        if not isMobile then task.wait(ESP_CHECK_INTERVAL); continue end
+        
+        -- Scan và fix ESP mismatch
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr == lp or not plr.Character then continue end
+            local char = plr.Character
+            local team = char.Parent and char.Parent.Name
+            local cfg = espConfigs[team]
+            if not cfg or not cfg.Enabled then continue end
+            
+            -- Check Highlight
+            local highlight = Storage:FindFirstChild(plr.Name.."_Highlight")
+            if highlight and not highlight.Enabled then
+                updateESPConfig(plr)  -- Fix properties
+                print("[ESP Fix] Re-enabled Highlight for " .. plr.Name)
+            end
+            
+            -- Check Nametag
+            local nametag = Storage:FindFirstChild(plr.Name.."_Nametag")
+            if nametag then
+                local nameLabel = nametag:FindFirstChild("PlayerName")
+                local healthLabel = nametag:FindFirstChild("HealthLabel")
+                if (cfg.Name and nameLabel and not nameLabel.Visible) or (cfg.HP and healthLabel and not healthLabel.Visible) then
+                    updateESPConfig(plr)  -- Fix visible
+                    print("[ESP Fix] Re-showed labels for " .. plr.Name)
+                end
+            end
+            
+            -- Nếu object mất hẳn, recreate
+            if not highlight and not nametag then
+                createOrUpdateESP(plr, char)
+                print("[ESP Fix] Recreated ESP for " .. plr.Name)
+            end
+        end
+        
+        task.wait(ESP_CHECK_INTERVAL)
+    end
+end)
 -- ========== Speed Settings (Optimized) ==========
 local character = lp.Character or lp.CharacterAdded:Wait()
 if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed", 10) end
