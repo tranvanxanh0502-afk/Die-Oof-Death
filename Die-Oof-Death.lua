@@ -1077,6 +1077,126 @@ tabSettings:CreateButton({
 })
 
 -- ============================
+-- Tab Animation (Change Animation)
+-- ============================
+local animationTab = Window:CreateTab("Animation")
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local selectedAnimation = "Old" -- mặc định
+
+-- Dữ liệu Animation Old / New
+local animationSets = {
+    Old = {
+        Adrenaline = "77399794134778",
+        AdrenalineEnd = "108799715147231",
+        Banana = "95775571866935",
+        BlockLand = "94027412516651",
+        BlockStart = "100651795910153",
+        Caretaker = "136588017093606",
+        CloakEnd = "120142279051418",
+        CloakStart = "117841747115136",
+        Dash = "82265255195607",
+        DynamiteHold = "137091713941325",
+        DynamiteThrow = "99551865645121",
+        DynamiteWindup = "133960279206605",
+        Hotdog = "93503428349113",
+        PadBuild = "82160380573308",
+        Punch = "135619604085485",
+        Revolver = "73034688541555",
+        RevolverReload = "79026181033717",
+        Taunt = "113732291990231"
+    },
+    New = {
+        Adrenaline = "77399794134778",
+        AdrenalineEnd = "92333601998082",
+        Banana = "95775571866935",
+        BlockLand = "94027412516651",
+        BlockStart = "134233326423882",
+        Caretaker = "128767098320893",
+        CloakEnd = "120142279051418",
+        CloakStart = "133960698072483",
+        Dash = "78278813483757",
+        DynamiteHold = "137091713941325",
+        DynamiteThrow = "99551865645121",
+        DynamiteWindup = "133960279206605",
+        Hotdog = "78595119178919",
+        PadBuild = "79104831518074",
+        Punch = "124781750889573",
+        Revolver = "74108653904830",
+        RevolverReload = "79026181033717",
+        Taunt = "113732291990231"
+    }
+}
+
+-- Hàm lấy folder Abilities
+local function getAbilitiesFolder()
+    local playerName = LocalPlayer.Name
+    local abilitiesFolder
+
+    local survivorPath = workspace:FindFirstChild("GameAssets")
+        and workspace.GameAssets:FindFirstChild("Teams")
+        and workspace.GameAssets.Teams:FindFirstChild("Survivor")
+        and workspace.GameAssets.Teams.Survivor:FindFirstChild(playerName)
+
+    if survivorPath and survivorPath:FindFirstChild("Animations") and survivorPath.Animations:FindFirstChild("Abilities") then
+        abilitiesFolder = survivorPath.Animations.Abilities
+    end
+
+    if not abilitiesFolder then
+        local localModel = workspace:FindFirstChild(playerName)
+        if localModel and localModel:GetChildren()[13] and localModel:GetChildren()[13]:FindFirstChild("Abilities") then
+            abilitiesFolder = localModel:GetChildren()[13].Abilities
+        end
+    end
+
+    return abilitiesFolder
+end
+
+-- Hàm thay Animation
+local function replaceAnimations(animationSet)
+    local abilitiesFolder = getAbilitiesFolder()
+    if not abilitiesFolder then
+        warn("[⚠️] Không tìm thấy folder Abilities!")
+        return
+    end
+
+    for name, id in pairs(animationSet) do
+        local anim = abilitiesFolder:FindFirstChild(name)
+        if anim and anim:IsA("Animation") then
+            anim.AnimationId = "rbxassetid://" .. id
+        end
+        task.wait(0.05)
+    end
+end
+
+-- Nút Anim Skill Old
+animationTab:CreateButton({
+    Name = "Anim Skill Old",
+    Callback = function()
+        selectedAnimation = "Old"
+        replaceAnimations(animationSets.Old)
+    end
+})
+
+-- Nút Anim Skill New
+animationTab:CreateButton({
+    Name = "Anim Skill New",
+    Callback = function()
+        selectedAnimation = "New"
+        replaceAnimations(animationSets.New)
+    end
+})
+
+-- Respawn tự động áp dụng animation
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(1)
+    if animationSets[selectedAnimation] then
+        replaceAnimations(animationSets[selectedAnimation])
+    end
+end)
+
+-- ============================
 -- Other Tab (Loadstring)
 -- ============================
 local tabOther = Window:CreateTab("Other", 4483362458)
