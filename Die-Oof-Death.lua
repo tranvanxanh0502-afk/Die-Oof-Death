@@ -925,47 +925,85 @@ local function cleanupSkill(skillName)
     end
     lastUsed[skillName] = nil
 end
+-- Make GUI draggable (enhanced for mobile + debug)
+local UserInputService = game:GetService("UserInputService")
 
--- Make GUI draggable (optimized: chỉ connect cần thiết)
 local function makeDraggable(frame, skillName)
     local cfg = buttonConfigs[skillName]
     if not cfg then return end
-    local dragging, dragStart, startPos = false, Vector2.new(), frame.Position
-    local connections = {}
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    local connections = {}  -- Để cleanup
 
     local function update(input)
         local delta = input.Position - dragStart
         frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 
+    -- Bắt đầu drag (mouse or touch)
     local function onInputBegan(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
-            local endConn = input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    cfg.pos = {frame.Position.X.Offset, frame.Position.Y.Offset}
-                    endConn:Disconnect()
-                end
-            end)
-            table.insert(connections, endConn)
+            print("[Drag Debug] Start drag for " .. skillName)  -- Debug: Xóa sau test
         end
     end
 
+    -- Kết thúc drag
+    local function onInputEnded(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+            if startPos then
+                cfg.pos = {frame.Position.X.Offset, frame.Position.Y.Offset}
+            end
+            print("[Drag Debug] End drag for " .. skillName .. " at pos: " .. tostring(cfg.pos[1]) .. "," .. tostring(cfg.pos[2]))  -- Debug
+        end
+    end
+
+    -- Di chuyển drag (mouse or touch)
     local function onInputChanged(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            update(input)
+        if dragging then
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                update(input)
+            end
         end
     end
 
-    local dragBeganConn = frame.InputBegan:Connect(onInputBegan)
-    local dragChangedConn = frame.InputChanged:Connect(onInputChanged)
-    table.insert(connections, dragBeganConn, dragChangedConn)  -- Không connect descendants để giảm leak
+    -- Connect frame events (base)
+    local frameBegan = frame.InputBegan:Connect(onInputBegan)
+    local frameChanged = frame.InputChanged:Connect(onInputChanged)
+    table.insert(connections, frameBegan, frameChanged)
+
+    -- Mobile/Touch: Sử dụng UIS cho global drag (reliable hơn)
+    local uisBegan = UserInputService.InputBegan:Connect(function(input)
+        if dragging then return end  -- Chỉ nếu không đang drag khác
+        onInputBegan(input)
+    end)
+    local uisEnded = UserInputService.InputEnded:Connect(onInputEnded)
+    local uisChanged = UserInputService.InputChanged:Connect(onInputChanged)
+    table.insert(connections, uisBegan, uisEnded, uisChanged)
+
+    -- Prevent click interfere: Disable button click khi dragging
+    local button = frame:FindFirstChild("TextButton", true)  -- Tìm recursive
+    if button then
+        local origClick = button.MouseButton1Click
+        button.MouseButton1Click:Connect(function()
+            if dragging then return end  -- Skip click nếu đang drag
+            if origClick then origClick:Fire() end  -- Gọi skill nếu có
+        end)
+    end
+
+    -- ZIndex cao để on top
+    frame.ZIndex = 10
+    for _, child in ipairs(frame:GetDescendants()) do
+        if child:IsA("GuiObject") then child.ZIndex = 10 end
+    end
 
     cfg.connections.drag = connections
 end
+
 
 -- Create skill button (chỉ tạo 1 lần, reuse sau)
 local function createSkillButton(skillName)
