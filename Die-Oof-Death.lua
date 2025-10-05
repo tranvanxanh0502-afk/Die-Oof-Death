@@ -414,44 +414,53 @@ cooldownLabel.TextScaled = true
 cooldownLabel.Text = "Ready"
 cooldownLabel.Parent = CooldownFrame
 
--- ================= Kéo Thả CooldownGUI =================
+-- ================= Kéo Thả GUI Đa Nền Tảng =================
 local UserInputService = game:GetService("UserInputService")
 local dragging = false
-local dragInput, mousePos, framePos
+local dragInput, startPos, framePos
 
-CooldownFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+local function updatePosition(delta)
+    CooldownFrame.Position = UDim2.new(
+        0,
+        framePos.X.Offset + delta.X,
+        0,
+        framePos.Y.Offset + delta.Y
+    )
+end
+
+-- Bắt đầu kéo (Mouse hoặc Touch)
+local function inputBegan(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
-        mousePos = input.Position
+        startPos = input.Position
         framePos = CooldownFrame.Position
 
-        -- Khi nhả chuột thì dừng kéo
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
             end
         end)
     end
-end)
+end
 
-CooldownFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
+-- Xác định loại input di chuyển
+local function inputChanged(input)
+    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         dragInput = input
     end
-end)
+end
 
+-- Cập nhật vị trí khi di chuyển
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
-        local delta = input.Position - mousePos
-        CooldownFrame.Position = UDim2.new(
-            0,
-            framePos.X.Offset + delta.X,
-            0,
-            framePos.Y.Offset + delta.Y
-        )
+        local delta = input.Position - startPos
+        updatePosition(delta)
     end
 end)
 
+-- Kết nối sự kiện
+CooldownFrame.InputBegan:Connect(inputBegan)
+CooldownFrame.InputChanged:Connect(inputChanged)
 -- ================= Rayfield GUI Tab =================
 local tabAutoBlock = Window:CreateTab("AutoBlock", 4483362458)
 
