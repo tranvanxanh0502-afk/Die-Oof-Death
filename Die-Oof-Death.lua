@@ -296,38 +296,115 @@ for teamName, cfg in pairs(espConfigs) do
         end
     })
 end
--- ========== Speed ==========
+-- ========== Speed Settings (Optimized) ==========
 local character = lp.Character or lp.CharacterAdded:Wait()
-if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed",10) end
-if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed",27) end
-local walkSpeedValue = character:GetAttribute("WalkSpeed")
-local sprintSpeedValue = character:GetAttribute("SprintSpeed")
+if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed", 10) end
+if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed", 27) end
+
+local walkSpeedValue = character:GetAttribute("WalkSpeed") or 10
+local sprintSpeedValue = character:GetAttribute("SprintSpeed") or 27
 local walkSpeedEnabled = false
 local sprintEnabled = false
 
+-- Cache cho current values để tránh set thừa
+local currentWalkSpeed = walkSpeedValue
+local currentSprintSpeed = sprintSpeedValue
+
+local speedConnection = nil  -- Để disconnect khi off
+
+local function updateSpeeds()
+    if unloaded or not character then return end
+    local currentWS = character:GetAttribute("WalkSpeed") or 10
+    local currentSS = character:GetAttribute("SprintSpeed") or 27
+    
+    if walkSpeedEnabled and currentWS ~= walkSpeedValue then
+        character:SetAttribute("WalkSpeed", walkSpeedValue)
+        currentWalkSpeed = walkSpeedValue
+    end
+    if sprintEnabled and currentSS ~= sprintSpeedValue then
+        character:SetAttribute("SprintSpeed", sprintSpeedValue)
+        currentSprintSpeed = sprintSpeedValue
+    end
+end
+
+local function startSpeedLoop()
+    if speedConnection then speedConnection:Disconnect() end
+    speedConnection = RunService.Heartbeat:Connect(updateSpeeds)  -- Heartbeat thay vì RenderStepped
+end
+
+local function stopSpeedLoop()
+    if speedConnection then
+        speedConnection:Disconnect()
+        speedConnection = nil
+    end
+end
+
 local tabSpeed = Window:CreateTab("Speed Settings", 4483362458)
-tabSpeed:CreateSlider({Name="WalkSpeed", Range={8,200}, Increment=1, CurrentValue=walkSpeedValue, Callback=function(val) walkSpeedValue=val end})
-tabSpeed:CreateToggle({Name="Enable WalkSpeed", CurrentValue=walkSpeedEnabled, Callback=function(v) walkSpeedEnabled=v; if not v and character then character:SetAttribute("WalkSpeed",10) end end})
-tabSpeed:CreateSlider({Name="SprintSpeed", Range={16,300}, Increment=1, CurrentValue=sprintSpeedValue, Callback=function(val) sprintSpeedValue=val end})
-tabSpeed:CreateToggle({Name="Enable Sprint", CurrentValue=sprintEnabled, Callback=function(v) sprintEnabled=v; if not v and character then character:SetAttribute("SprintSpeed",27) end end})
-
-mainConns.renderStepped = RunService.RenderStepped:Connect(function()
-    if unloaded then return end
-    local char = lp.Character
-    if not char then return end
-    if walkSpeedEnabled and char:GetAttribute("WalkSpeed") ~= walkSpeedValue then
-        char:SetAttribute("WalkSpeed", walkSpeedValue)
+tabSpeed:CreateSlider({
+    Name="WalkSpeed", 
+    Range={8,200}, 
+    Increment=1, 
+    CurrentValue=walkSpeedValue, 
+    Callback=function(val) 
+        walkSpeedValue = val 
+        if walkSpeedEnabled then updateSpeeds() end  -- Update ngay nếu đang on
     end
-    if sprintEnabled and char:GetAttribute("SprintSpeed") ~= sprintSpeedValue then
-        char:SetAttribute("SprintSpeed", sprintSpeedValue)
+})
+tabSpeed:CreateToggle({
+    Name="Enable WalkSpeed", 
+    CurrentValue=walkSpeedEnabled, 
+    Callback=function(v) 
+        walkSpeedEnabled = v
+        if v then 
+            startSpeedLoop()
+            updateSpeeds()  -- Set ngay
+        else 
+            if character then character:SetAttribute("WalkSpeed", 10) end
+            stopSpeedLoop()
+        end
     end
-end)
+})
+tabSpeed:CreateSlider({
+    Name="SprintSpeed", 
+    Range={16,300}, 
+    Increment=1, 
+    CurrentValue=sprintSpeedValue, 
+    Callback=function(val) 
+        sprintSpeedValue = val 
+        if sprintEnabled then updateSpeeds() end  -- Update ngay nếu đang on
+    end
+})
+tabSpeed:CreateToggle({
+    Name="Enable Sprint", 
+    CurrentValue=sprintEnabled, 
+    Callback=function(v) 
+        sprintEnabled = v
+        if v then 
+            startSpeedLoop()
+            updateSpeeds()  -- Set ngay
+        else 
+            if character then character:SetAttribute("SprintSpeed", 27) end
+            stopSpeedLoop()
+        end
+    end
+})
 
+-- Handle CharacterAdded cho speed
 mainConns.charAdded_speed = lp.CharacterAdded:Connect(function(char)
     character = char
-    if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed",walkSpeedValue) end
-    if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed",sprintSpeedValue) end
+    task.wait(0.5)  -- Đợi load đầy đủ
+    if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed", walkSpeedValue) end
+    if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed", sprintSpeedValue) end
+    currentWalkSpeed = walkSpeedValue
+    currentSprintSpeed = sprintSpeedValue
+    -- Restart loop nếu đang enabled
+    if walkSpeedEnabled or sprintEnabled then
+        startSpeedLoop()
+    end
 end)
+
+-- Cleanup khi unload (thêm vào nếu có unload event)
+-- stopSpeedLoop()
 
 --// Auto Block+
 --// Services
