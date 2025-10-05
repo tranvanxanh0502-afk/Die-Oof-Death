@@ -925,21 +925,101 @@ local function cleanupSkill(skillName)
     end
     lastUsed[skillName] = nil
 end
--- Make GUI draggable (enhanced for mobile + debug)
+-- Make GUI draggable (fixed: scoped start + global move, mobile-friendly)
 local UserInputService = game:GetService("UserInputService")
 
 local function makeDraggable(frame, skillName)
     local cfg = buttonConfigs[skillName]
     if not cfg then return end
+    
     local dragging = false
     local dragStart = nil
     local startPos = nil
-    local connections = {}  -- Để cleanup
+    local moveConnection = nil  -- UIS move conn (disconnect khi end)
+    local endConnection = nil   -- UIS end conn
+    local connections = {}      -- Base connections
 
     local function update(input)
         local delta = input.Position - dragStart
         frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
+
+    -- Start drag: Chỉ khi input trên FRAME (scoped)
+    local function onFrameInputBegan(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            print("[Drag Debug] Start drag for " .. skillName .. " at " .. tostring(input.Position))  -- Debug
+            
+            -- Switch to global UIS for move/end (mượt mobile)
+            moveConnection = UserInputService.InputChanged:Connect(function(inputMoved)
+                if dragging and (inputMoved.UserInputType == Enum.UserInputType.MouseMovement or inputMoved.UserInputType == Enum.UserInputType.Touch) then
+                    update(inputMoved)
+                end
+            end)
+            
+            endConnection = UserInputService.InputEnded:Connect(function(inputEnded)
+                if inputEnded.UserInputType == Enum.UserInputType.MouseButton1 or inputEnded.UserInputType == Enum.UserInputType.Touch then
+                    dragging = false
+                    if startPos then
+                        cfg.pos = {frame.Position.X.Offset, frame.Position.Y.Offset}
+                        print("[Drag Debug] End drag for " .. skillName .. " at pos: " .. tostring(cfg.pos[1]) .. "," .. tostring(cfg.pos[2]))  -- Debug
+                    end
+                    
+                    -- Disconnect UIS (no leak)
+                    if moveConnection then moveConnection:Disconnect(); moveConnection = nil end
+                    if endConnection then endConnection:Disconnect(); endConnection = nil end
+                end
+            end)
+        end
+    end
+
+    -- Connect frame events (base + descendants cho touch)
+    local frameBeganConn = frame.InputBegan:Connect(onFrameInputBegan)
+    table.insert(connections, frameBeganConn)
+    
+    -- Connect descendants (inner frame, icon, etc.) để touch dễ hơn
+    for _, child in ipairs(frame:GetDescendants()) do
+        if child:IsA("GuiObject") and child ~= frame then
+            local childBeganConn = child.InputBegan:Connect(onFrameInputBegan)
+            table.insert(connections, childBeganConn)
+        end
+    end
+
+    -- Prevent click interfere: Block click nếu dragging (per button)
+    local button = frame:FindFirstChild("TextButton", true)
+    if button then
+        local clickConn = button.MouseButton1Click:Connect(function()
+            if dragging then 
+                print("[Drag Debug] Click blocked during drag for " .. skillName)  -- Debug
+                return  -- Skip click
+            end
+            -- Original click: Fire skill (gọi remote)
+            local cooldown = tonumber(SkillsModule[skillName].Cooldown) or 1
+            local now = os.clock()
+            if not lastUsed[skillName] or now - lastUsed[skillName] >= cooldown then
+                lastUsed[skillName] = now
+                local remoteFunc = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
+                pcall(function() remoteFunc:InvokeServer(skillName) end)
+                -- Cooldown logic (giữ nguyên từ createSkillButton)
+            end
+        end)
+        table.insert(connections, clickConn)
+    end
+
+    -- ZIndex cao + Active=true để dễ touch
+    frame.ZIndex = 10
+    frame.Active = true  -- Giúp frame "catch" input tốt hơn
+    for _, child in ipairs(frame:GetDescendants()) do
+        if child:IsA("GuiObject") then 
+            child.ZIndex = 10 
+            if child:IsA("TextButton") then child.Active = true end
+        end
+    end
+
+    cfg.connections.drag = connections
+end
 
     -- Bắt đầu drag (mouse or touch)
     local function onInputBegan(input)
