@@ -49,7 +49,7 @@ do
     if Rayfield.Notify then Rayfield.Notify = function() end end
 end
 
-Window = Rayfield:CreateWindow({
+local Window = Rayfield:CreateWindow({
     Name="HUB (Die of Death)TY @maxiedsu/gonnered",
     LoadingTitle="Loading...TY @maxiedsu/gonnered",
     LoadingSubtitle="by cutotoite_10",
@@ -72,21 +72,68 @@ local function createLabel(name,parent,posY)
     return label
 end
 
-local function setupHealthDisplay(plr, humanoid, healthLabel, cfg)
+local function setupHealthDisplay(plr, humanoid, healthLabel)
     local function update()
-        if cfg.HP and cfg.Enabled then
+        local char = plr.Character
+        if not char then return end
+        local team = char.Parent and char.Parent.Name
+        local cfg = team and espConfigs[team]
+        if cfg and cfg.HP and cfg.Enabled then
             healthLabel.Visible = true
             healthLabel.Text = ("HP: %d/%d"):format(math.floor(humanoid.Health), humanoid.MaxHealth)
         else
             healthLabel.Visible = false
         end
     end
-    update()
+    update()  -- Gọi lần đầu
     connections[plr] = connections[plr] or {}
     if connections[plr].HealthChanged then
         pcall(function() connections[plr].HealthChanged:Disconnect() end)
     end
     connections[plr].HealthChanged = humanoid.HealthChanged:Connect(update)
+end
+
+local function updateESPConfig(plr)
+    if not plr or not plr.Character then return end
+    local char = plr.Character
+    local highlight = Storage:FindFirstChild(plr.Name.."_Highlight")
+    local nametag = Storage:FindFirstChild(plr.Name.."_Nametag")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local team = char.Parent and char.Parent.Name
+    local cfg = espConfigs[team]
+    if not cfg or not humanoid then return end
+
+    if highlight then
+        highlight.Enabled = cfg.Enabled
+        highlight.FillColor = cfg.FillColor
+        highlight.OutlineColor = cfg.OutlineColor
+        highlight.FillTransparency = (cfg.Fill and cfg.FillTransparency) or 1
+        highlight.OutlineTransparency = (cfg.Outline and cfg.OutlineTransparency) or 1
+    end
+    if nametag then
+        local nameLabel = nametag:FindFirstChild("PlayerName")
+        local healthLabel = nametag:FindFirstChild("HealthLabel")
+        if nameLabel then 
+            nameLabel.Visible = cfg.Enabled and cfg.Name
+            nameLabel.TextColor3 = cfg.FillColor
+            nameLabel.Text = plr.Name  -- Set name nếu chưa có
+        end
+        if healthLabel then 
+            healthLabel.Visible = cfg.Enabled and cfg.HP
+            -- Health sẽ update qua event riêng
+        end
+    end
+end
+
+local function cleanupESP(plr)
+    for _, suffix in ipairs({"_Highlight","_Nametag"}) do
+        local obj = Storage:FindFirstChild(plr.Name..suffix)
+        if obj then pcall(function() obj:Destroy() end) end
+    end
+    if connections[plr] and connections[plr].HealthChanged then
+        pcall(function() connections[plr].HealthChanged:Disconnect() end)
+        connections[plr].HealthChanged = nil
+    end
 end
 
 local function createOrUpdateESP(plr, char)
@@ -97,55 +144,58 @@ local function createOrUpdateESP(plr, char)
     local cfg = espConfigs[team]
     if not cfg or not humanoid then return end
 
-    -- luôn xóa ESP cũ trước khi tạo mới
-    for _, suffix in ipairs({"_Highlight","_Nametag"}) do
-        local old = Storage:FindFirstChild(plr.Name..suffix)
-        if old then pcall(function() old:Destroy() end) end
-    end
+    -- Cleanup trước nếu có ESP cũ
+    cleanupESP(plr)
 
+    -- Tạo mới
     local highlight = Instance.new("Highlight")
     highlight.Name = plr.Name.."_Highlight"
     highlight.DepthMode = DepthMode
     highlight.Adornee = char
-    highlight.Enabled = cfg.Enabled
-    highlight.FillColor = cfg.FillColor
-    highlight.OutlineColor = cfg.OutlineColor
-    highlight.FillTransparency = (cfg.Fill and cfg.FillTransparency) or 1
-    highlight.OutlineTransparency = (cfg.Outline and cfg.OutlineTransparency) or 1
     highlight.Parent = Storage
 
-    if hrp then
-        local nametag = Instance.new("BillboardGui")
-        nametag.Name = plr.Name.."_Nametag"
-        nametag.Size = UDim2.new(0,120,0,40)
-        nametag.StudsOffset = Vector3.new(0,2.5,0)
-        nametag.AlwaysOnTop = true
-        nametag.Adornee = hrp
-        nametag.Parent = Storage
-        createLabel("PlayerName", nametag, 0).Text = plr.Name
-        createLabel("HealthLabel", nametag, 0.5)
-        local nameLabel = nametag:FindFirstChild("PlayerName")
-        local healthLabel = nametag:FindFirstChild("HealthLabel")
-        if nameLabel then nameLabel.Visible = cfg.Enabled and cfg.Name; nameLabel.TextColor3 = cfg.FillColor end
-        if healthLabel then setupHealthDisplay(plr, humanoid, healthLabel, cfg) end
-    end
+    if not hrp then return end
+
+    local nametag = Instance.new("BillboardGui")
+    nametag.Name = plr.Name.."_Nametag"
+    nametag.Size = UDim2.new(0,120,0,40)
+    nametag.StudsOffset = Vector3.new(0,2.5,0)
+    nametag.AlwaysOnTop = true
+    nametag.Adornee = hrp
+    nametag.Parent = Storage
+    local nameLabel = createLabel("PlayerName", nametag, 0)
+    nameLabel.Text = plr.Name
+    local healthLabel = createLabel("HealthLabel", nametag, 0.5)
+
+    -- Update config
+    updateESPConfig(plr)
+
+    -- Setup health
+    setupHealthDisplay(plr, humanoid, healthLabel)
+
+    -- Thêm connection cho Died để cleanup
+    connections[plr].Died = humanoid.Died:Connect(function()
+        cleanupESP(plr)
+    end)
+
+    -- Thêm connection cho CharacterRemoving (nếu character destroyed)
+    connections[plr].CharacterRemoving = plr.CharacterRemoving:Connect(function()
+        cleanupESP(plr)
+    end)
 end
 
 local function onPlayerAdded(plr)
     if plr == lp then return end
     connections[plr] = connections[plr] or {}
     connections[plr].CharacterAdded = plr.CharacterAdded:Connect(function(char)
-        task.wait(1)
+        task.wait(2.5)
         createOrUpdateESP(plr, char)
     end)
     if plr.Character then createOrUpdateESP(plr, plr.Character) end
 end
 
 local function onPlayerRemoving(plr)
-    for _, suffix in ipairs({"_Highlight","_Nametag"}) do
-        local obj = Storage:FindFirstChild(plr.Name..suffix)
-        if obj then pcall(function() obj:Destroy() end) end
-    end
+    cleanupESP(plr)
     if connections[plr] then
         for _, conn in pairs(connections[plr]) do
             if typeof(conn) == "RBXScriptConnection" then
@@ -160,29 +210,92 @@ mainConns.playersAdded = Players.PlayerAdded:Connect(onPlayerAdded)
 mainConns.playersRemoving = Players.PlayerRemoving:Connect(onPlayerRemoving)
 for _,v in ipairs(Players:GetPlayers()) do onPlayerAdded(v) end
 
--- auto refresh ESP mỗi giây
-task.spawn(function()
-    while not unloaded do
-        task.wait(1)
-        for _,v in ipairs(Players:GetPlayers()) do
-            if v ~= lp and v.Character then createOrUpdateESP(v, v.Character) end
-        end
+-- UI với callbacks update ESP
+local function updateAllESP()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= lp then updateESPConfig(plr) end
     end
-end)
+end
 
 for teamName, cfg in pairs(espConfigs) do
     local tab = Window:CreateTab(teamName.." ESP", 4483362458)
-    tab:CreateToggle({Name="Enable ESP", CurrentValue=cfg.Enabled, Callback=function(v) cfg.Enabled=v end})
-    tab:CreateToggle({Name="Show Name", CurrentValue=cfg.Name, Callback=function(v) cfg.Name=v end})
-    tab:CreateToggle({Name="Show HP", CurrentValue=cfg.HP, Callback=function(v) cfg.HP=v end})
-    tab:CreateToggle({Name="Show Fill", CurrentValue=cfg.Fill, Callback=function(v) cfg.Fill=v end})
-    tab:CreateColorPicker({Name="Fill Color", Color=cfg.FillColor, Callback=function(c) cfg.FillColor=c end})
-    tab:CreateSlider({Name="Fill Transparency", Range={0,1}, Increment=0.05, CurrentValue=cfg.FillTransparency, Callback=function(v) cfg.FillTransparency=v end})
-    tab:CreateToggle({Name="Show Outline", CurrentValue=cfg.Outline, Callback=function(v) cfg.Outline=v end})
-    tab:CreateColorPicker({Name="Outline Color", Color=cfg.OutlineColor, Callback=function(c) cfg.OutlineColor=c end})
-    tab:CreateSlider({Name="Outline Transparency", Range={0,1}, Increment=0.05, CurrentValue=cfg.OutlineTransparency, Callback=function(v) cfg.OutlineTransparency=v end})
+    tab:CreateToggle({
+        Name="Enable ESP", 
+        CurrentValue=cfg.Enabled, 
+        Callback=function(v) 
+            cfg.Enabled = v 
+            updateAllESP()
+        end
+    })
+    tab:CreateToggle({
+        Name="Show Name", 
+        CurrentValue=cfg.Name, 
+        Callback=function(v) 
+            cfg.Name = v 
+            updateAllESP()
+        end
+    })
+    tab:CreateToggle({
+        Name="Show HP", 
+        CurrentValue=cfg.HP, 
+        Callback=function(v) 
+            cfg.HP = v 
+            updateAllESP()
+        end
+    })
+    tab:CreateToggle({
+        Name="Show Fill", 
+        CurrentValue=cfg.Fill, 
+        Callback=function(v) 
+            cfg.Fill = v 
+            updateAllESP()
+        end
+    })
+    tab:CreateColorPicker({
+        Name="Fill Color", 
+        Color=cfg.FillColor, 
+        Callback=function(c) 
+            cfg.FillColor = c 
+            updateAllESP()
+        end
+    })
+    tab:CreateSlider({
+        Name="Fill Transparency", 
+        Range={0,1}, 
+        Increment=0.05, 
+        CurrentValue=cfg.FillTransparency, 
+        Callback=function(v) 
+            cfg.FillTransparency = v 
+            updateAllESP()
+        end
+    })
+    tab:CreateToggle({
+        Name="Show Outline", 
+        CurrentValue=cfg.Outline, 
+        Callback=function(v) 
+            cfg.Outline = v 
+            updateAllESP()
+        end
+    })
+    tab:CreateColorPicker({
+        Name="Outline Color", 
+        Color=cfg.OutlineColor, 
+        Callback=function(c) 
+            cfg.OutlineColor = c 
+            updateAllESP()
+        end
+    })
+    tab:CreateSlider({
+        Name="Outline Transparency", 
+        Range={0,1}, 
+        Increment=0.05, 
+        CurrentValue=cfg.OutlineTransparency, 
+        Callback=function(v) 
+            cfg.OutlineTransparency = v 
+            updateAllESP()
+        end
+    })
 end
-
 -- ========== Speed ==========
 local character = lp.Character or lp.CharacterAdded:Wait()
 if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed",10) end
