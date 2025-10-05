@@ -414,6 +414,44 @@ cooldownLabel.TextScaled = true
 cooldownLabel.Text = "Ready"
 cooldownLabel.Parent = CooldownFrame
 
+-- ================= Kéo Thả CooldownGUI =================
+local UserInputService = game:GetService("UserInputService")
+local dragging = false
+local dragInput, mousePos, framePos
+
+CooldownFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        mousePos = input.Position
+        framePos = CooldownFrame.Position
+
+        -- Khi nhả chuột thì dừng kéo
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+CooldownFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - mousePos
+        CooldownFrame.Position = UDim2.new(
+            0,
+            framePos.X.Offset + delta.X,
+            0,
+            framePos.Y.Offset + delta.Y
+        )
+    end
+end)
+
 -- ================= Rayfield GUI Tab =================
 local tabAutoBlock = Window:CreateTab("AutoBlock", 4483362458)
 
