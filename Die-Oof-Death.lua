@@ -414,53 +414,67 @@ cooldownLabel.TextScaled = true
 cooldownLabel.Text = "Ready"
 cooldownLabel.Parent = CooldownFrame
 
--- ================= Kéo Thả GUI Đa Nền Tảng =================
+-- ================= Kéo Thả GUI Cooldown (Ready / On Cooldown) =================
 local UserInputService = game:GetService("UserInputService")
-local dragging = false
-local dragInput, startPos, framePos
 
+-- Frame chính chứa Ready / On Cooldown
+local CooldownFrame = CoreGui:FindFirstChild("AutoBlockCooldown")  -- hoặc frame bạn tạo
+if not CooldownFrame then
+    warn("[Drag GUI] Không tìm thấy CooldownFrame!")
+    return
+end
+
+-- Biến hỗ trợ drag
+local dragging = false
+local dragInput, startPos, frameStart
+
+-- Hàm cập nhật vị trí frame
 local function updatePosition(delta)
-    CooldownFrame.Position = UDim2.new(
-        0,
-        framePos.X.Offset + delta.X,
-        0,
-        framePos.Y.Offset + delta.Y
-    )
+    if frameStart then
+        CooldownFrame.Position = UDim2.new(
+            frameStart.X.Scale,
+            frameStart.X.Offset + delta.X,
+            frameStart.Y.Scale,
+            frameStart.Y.Offset + delta.Y
+        )
+    end
 end
 
 -- Bắt đầu kéo (Mouse hoặc Touch)
 local function inputBegan(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
+        dragInput = input
         startPos = input.Position
-        framePos = CooldownFrame.Position
+        frameStart = CooldownFrame.Position
 
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
+                dragInput = nil
             end
         end)
     end
 end
 
--- Xác định loại input di chuyển
+-- Cập nhật khi di chuyển chuột hoặc touch
 local function inputChanged(input)
-    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        dragInput = input
-    end
-end
-
--- Cập nhật vị trí khi di chuyển
-UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - startPos
         updatePosition(delta)
     end
-end)
+end
 
 -- Kết nối sự kiện
 CooldownFrame.InputBegan:Connect(inputBegan)
 CooldownFrame.InputChanged:Connect(inputChanged)
+UserInputService.InputChanged:Connect(inputChanged)
+
+-- ================= Tích hợp vị trí lưu trữ =================
+-- Lưu vị trí cuối cùng nếu muốn giữ khi respawn hoặc reload GUI
+CooldownFrame:GetAttributeChangedSignal("Position"):Connect(function()
+    frameStart = CooldownFrame.Position
+end)
 -- ================= Rayfield GUI Tab =================
 local tabAutoBlock = Window:CreateTab("AutoBlock", 4483362458)
 
