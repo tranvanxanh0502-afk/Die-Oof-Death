@@ -855,45 +855,13 @@ end)
 
 -- PART 2: Skills & Selector
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part 1)
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
+local lp = lp or game:GetService("Players").LocalPlayer
 
--- Chờ LocalPlayer
-local lp = Players.LocalPlayer
-if not lp then
-    warn("Waiting for LocalPlayer...")
-    lp = Players.PlayerAdded:Wait()
-end
-
--- Kiểm tra Window trước khi dùng
-if not Window or not Window.CreateTab then
-    warn("Window is not properly initialized! Check GUI main script.")
-    return
-end
-
-local skillList = {"Revolver", "Punch", "Block", "Caretaker", "Hotdog", "Taunt", "Cloak", "Dash", "Banana", "BonusPad", "Adrenaline"}
+local skillList = {"Revolver","Punch","Block","Caretaker","Hotdog","Taunt","Cloak","Dash","Banana","BonusPad","Adrenaline"}
 local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
 
 -- Tab GUI
--- mainConns.skillsCleanup = ... (nếu có unload event, gọi cleanupAllSkills())
--- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI + AntiAnim + Other Tab)
-
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local CoreGui = game:GetService("CoreGui")
-local lp = Players.LocalPlayer
-local Storage = CoreGui:FindFirstChild("Highlight_Storage")
-
--- Khai báo mặc định tránh nil
-mainConns = mainConns or {}
-unloaded = unloaded or false
-connections = connections or {}
-
--- Tab GUI
--- Tab GUI (giả định Window đã được định nghĩa bởi GUI chính)
 local tabSkills = Window:CreateTab("Skills & Selector", 4483362458)
 local skillParagraph = tabSkills:CreateParagraph({
     Title = "Selected Skills",
@@ -925,21 +893,7 @@ tabSkills:CreateDropdown({
 tabSkills:CreateButton({
     Name = "Select Skills",
     Callback = function()
-        local events = ReplicatedStorage:WaitForChild("Events", 5)
-        if not events then
-            warn("Events folder not found in ReplicatedStorage!")
-            return
-        end
-        local remoteEvents = events:WaitForChild("RemoteEvents", 5)
-        if not remoteEvents then
-            warn("RemoteEvents folder not found!")
-            return
-        end
-        local abilitySelection = remoteEvents:WaitForChild("AbilitySelection", 5)
-        if not abilitySelection then
-            warn("AbilitySelection RemoteEvent not found!")
-            return
-        end
+        local abilitySelection = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteEvents"):WaitForChild("AbilitySelection")
         abilitySelection:FireServer({selectedSkill1, selectedSkill2})
     end
 })
@@ -952,79 +906,45 @@ guiStorage.ResetOnSpawn = false
 guiStorage.IgnoreGuiInset = true
 guiStorage.Parent = lp:WaitForChild("PlayerGui")
 
-local buttonConfigs = {} -- [skillName] = {size=46, pos={100,100}, frame=nil, connections={}}
+local buttonConfigs = {} -- [skillName] = {size,pos}
 local lastUsed = {}      -- [skillName] = os.clock()
 
--- Cleanup function
-local function cleanupSkill(skillName)
-    local cfg = buttonConfigs[skillName]
-    if cfg and cfg.frame then
-        for _, conn in pairs(cfg.connections or {}) do
-            if typeof(conn) == "RBXScriptConnection" then
-                pcall(function() conn:Disconnect() end)
-            end
-        end
-        cfg.frame:Destroy()
-        cfg.frame = nil
-        cfg.connections = {}
-    end
-    lastUsed[skillName] = nil
-end
-
--- Make draggable function (optimized)
+-- Make GUI draggable
 local function makeDraggable(frame, skillName)
-    local cfg = buttonConfigs[skillName]
-    if not cfg or not frame then return end
-
-    frame.Active = true
-    frame.ZIndex = 10
-    local dragging, dragStart, startPos = false, nil, nil
-    cfg.connections = cfg.connections or {}
+    local dragging, dragStart, startPos = false, Vector2.new(), frame.Position
 
     local function update(input)
         local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                   startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
     end
 
     local function onInputBegan(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or
-           input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
-            print("[Drag Debug] Start drag for " .. skillName)
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    buttonConfigs[skillName].pos = {frame.Position.X.Offset, frame.Position.Y.Offset}
+                end
+            end)
         end
     end
 
     local function onInputChanged(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
-                         input.UserInputType == Enum.UserInputType.Touch) then
+        if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
             update(input)
         end
     end
 
-    local function onInputEnded(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or
-           input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-            cfg.pos = {frame.Position.X.Offset, frame.Position.Y.Offset}
-            print("[Drag Debug] End drag for " .. skillName .. " at " .. tostring(cfg.pos[1]) .. "," .. tostring(cfg.pos[2]))
-        end
-    end
-
-    -- Connect to frame and descendants
-    local frameBegan = frame.InputBegan:Connect(onInputBegan)
-    local frameChanged = frame.InputChanged:Connect(onInputChanged)
-    local frameEnded = UserInputService.InputEnded:Connect(onInputEnded)
-    table.insert(cfg.connections, frameBegan)
-    table.insert(cfg.connections, frameChanged)
-    table.insert(cfg.connections, frameEnded)
+    frame.InputBegan:Connect(onInputBegan)
+    frame.InputChanged:Connect(onInputChanged)
 
     for _, child in ipairs(frame:GetDescendants()) do
         if child:IsA("GuiObject") then
-            table.insert(cfg.connections, child.InputBegan:Connect(onInputBegan))
-            table.insert(cfg.connections, child.InputChanged:Connect(onInputChanged))
+            child.InputBegan:Connect(onInputBegan)
+            child.InputChanged:Connect(onInputChanged)
         end
     end
 end
@@ -1034,26 +954,19 @@ local function createSkillButton(skillName)
     local skillData = SkillsModule[skillName]
     if not skillData then return end
 
-    local cfg = buttonConfigs[skillName] or {size=46, pos={100,100}, frame=nil, connections={}}
+    local cfg = buttonConfigs[skillName] or {size=46,pos={100,100}}
     buttonConfigs[skillName] = cfg
 
-    if cfg.frame then
-        cfg.frame.Visible = true
-        cfg.frame.Size = UDim2.new(0, cfg.size, 0, cfg.size)
-        cfg.frame.Position = UDim2.new(0, cfg.pos[1], 0, cfg.pos[2])
-        return cfg.frame
-    end
+    local old = guiStorage:FindFirstChild(skillName.."_Btn")
+    if old then old:Destroy() end
 
-    cleanupSkill(skillName)
-
+    -- Frame & visuals
     local btnFrame = Instance.new("Frame")
     btnFrame.Name = skillName.."_Btn"
-    btnFrame.Size = UDim2.new(0, cfg.size, 0, cfg.size)
-    btnFrame.Position = UDim2.new(0, cfg.pos[1], 0, cfg.pos[2])
+    btnFrame.Size = UDim2.new(0,cfg.size,0,cfg.size)
+    btnFrame.Position = UDim2.new(0,cfg.pos[1],0,cfg.pos[2])
     btnFrame.BackgroundTransparency = 1
-    btnFrame.Visible = true
     btnFrame.Parent = guiStorage
-    cfg.frame = btnFrame
 
     local border = Instance.new("UIStroke")
     border.Thickness = 2
@@ -1077,7 +990,6 @@ local function createSkillButton(skillName)
     icon.Parent = innerFrame
 
     local cooldownOverlay = Instance.new("Frame")
-    cooldownOverlay.Name = "CooldownOverlay"
     cooldownOverlay.Size = UDim2.new(1,0,1,0)
     cooldownOverlay.BackgroundColor3 = Color3.fromRGB(0,0,0)
     cooldownOverlay.BackgroundTransparency = 0.6
@@ -1085,52 +997,57 @@ local function createSkillButton(skillName)
     cooldownOverlay.Visible = false
     cooldownOverlay.Parent = innerFrame
 
+    local cdLabel = Instance.new("TextLabel")
+    cdLabel.Size = UDim2.new(1,0,1,0)
+    cdLabel.BackgroundTransparency = 1
+    cdLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    cdLabel.TextScaled = true
+    cdLabel.Font = Enum.Font.GothamBold
+    cdLabel.Visible = false
+    cdLabel.Parent = cooldownOverlay
+
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1,0,1,0)
     button.BackgroundTransparency = 1
     button.Text = ""
     button.Parent = innerFrame
 
-    local clickConn = button.MouseButton1Click:Connect(function()
+    -- Button click
+    button.MouseButton1Click:Connect(function()
         local cooldown = tonumber(skillData.Cooldown) or 1
         local now = os.clock()
         if not lastUsed[skillName] or now - lastUsed[skillName] >= cooldown then
             lastUsed[skillName] = now
-            local remoteFunc = ReplicatedStorage:WaitForChild("Events", 5):WaitForChild("RemoteFunctions", 5):WaitForChild("UseAbility", 5)
-            if remoteFunc then
-                pcall(function() remoteFunc:InvokeServer(skillName) end)
-            else
-                warn("UseAbility RemoteFunction not found!")
-            end
-
-            cooldownOverlay.Size = UDim2.new(1,0,0,0)
+            local remoteFunc = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
+            pcall(function() remoteFunc:InvokeServer(skillName) end)
             cooldownOverlay.Visible = true
-            local tweenInfo = TweenInfo.new(cooldown, Enum.EasingStyle.Linear)
-            local tween = TweenService:Create(cooldownOverlay, tweenInfo, {Size = UDim2.new(1,0,1,0)})
-            tween:Play()
-            tween.Completed:Connect(function()
+            cdLabel.Visible = true
+
+            task.spawn(function()
+                local t = cooldown
+                while t > 0 do
+                    cdLabel.Text = tostring(math.ceil(t))
+                    task.wait(1)
+                    t -= 1
+                end
                 cooldownOverlay.Visible = false
+                cdLabel.Visible = false
             end)
         end
     end)
-    table.insert(cfg.connections, clickConn)
 
     makeDraggable(btnFrame, skillName)
-    return btnFrame
 end
 
--- Hide skill button
-local function hideSkillButton(skillName)
-    local cfg = buttonConfigs[skillName]
-    if cfg and cfg.frame then
-        cfg.frame.Visible = false
-    end
+-- Remove skill button
+local function removeSkillButton(skillName)
+    local old = guiStorage:FindFirstChild(skillName.."_Btn")
+    if old then old:Destroy() end
 end
 
--- Toggles + sliders for each skill
+-- Create toggles + sliders for each skill
 for _, skillName in ipairs(skillList) do
     local enabled = false
-    local lastSize = 46
 
     tabSkills:CreateToggle({
         Name = "Enable "..skillName,
@@ -1140,7 +1057,7 @@ for _, skillName in ipairs(skillList) do
             if v then
                 createSkillButton(skillName)
             else
-                hideSkillButton(skillName)
+                removeSkillButton(skillName)
             end
         end
     })
@@ -1151,31 +1068,31 @@ for _, skillName in ipairs(skillList) do
         Increment = 1,
         CurrentValue = 46,
         Callback = function(val)
-            local cfg = buttonConfigs[skillName]
-            if not cfg then return end
-            if math.abs(val - lastSize) < 5 then return end
-            lastSize = val
-            cfg.size = val
-            if enabled then
-                local frame = cfg.frame
-                if frame then
-                    frame.Size = UDim2.new(0, val, 0, val)
-                else
-                    createSkillButton(skillName)
-                end
+            if not buttonConfigs[skillName] then
+                buttonConfigs[skillName] = {size=val,pos={100,100}}
+            else
+                buttonConfigs[skillName].size = val
             end
+            if enabled then createSkillButton(skillName) end
         end
     })
 end
+-- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI + AntiAnim + Other Tab)
 
--- Global cleanup
-local function cleanupAllSkills()
-    for skillName, _ in pairs(buttonConfigs) do
-        cleanupSkill(skillName)
-    end
-    buttonConfigs = {}
-    lastUsed = {}
-end
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local lp = Players.LocalPlayer
+local Storage = CoreGui:FindFirstChild("Highlight_Storage")
+
+-- Khai bĂ¡o máº·c Ä‘á»‹nh trĂ¡nh nil
+mainConns = mainConns or {}
+unloaded = unloaded or false
+connections = connections or {}
+
+-- Tab GUI
+local tabGameplay = Window:CreateTab("Gameplay Settings", 4483362458)
 
 -- ============================
 -- WalkSpeed Modifier Lock
@@ -1208,7 +1125,7 @@ tabGameplay:CreateToggle({
 
 tabGameplay:CreateInput({
     Name="Custom MaxStamina (0-999999)",
-    PlaceholderText="Nhập số...",
+    PlaceholderText="Nháº­p sá»‘...",
     RemoveTextAfterFocusLost=true,
     Callback=function(text)
         local num = tonumber(text)
@@ -1218,7 +1135,7 @@ tabGameplay:CreateInput({
                 lp.Character:SetAttribute("MaxStamina",customStamina)
             end
         else
-            warn("Giá trị không hợp lệ (0-999999)")
+            warn("GiĂ¡ trá»‹ khĂ´ng há»£p lá»‡ (0-999999)")
         end
     end
 })
@@ -1439,7 +1356,7 @@ tabSettings:CreateButton({
         local g = CoreGui:FindFirstChild("Rayfield")
         if g then pcall(function() g:Destroy() end) end
 
-        warn("[SCRIPT] Đã Unload thành công.")
+        warn("[SCRIPT] ÄĂ£ Unload thĂ nh cĂ´ng.")
     end
 })
 
@@ -1450,9 +1367,9 @@ local animationTab = Window:CreateTab("Animation", 4483362458)
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local selectedAnimation = "Old" -- mặc định
+local selectedAnimation = "Old" -- máº·c Ä‘á»‹nh
 
--- Dữ liệu Animation Old / New
+-- Dá»¯ liá»‡u Animation Old / New
 local animationSets = {
     Old = {
         Adrenaline = "77399794134778",
@@ -1496,7 +1413,7 @@ local animationSets = {
     }
 }
 
--- Hàm lấy folder Abilities
+-- HĂ m láº¥y folder Abilities
 local function getAbilitiesFolder()
     local playerName = LocalPlayer.Name
     local abilitiesFolder
@@ -1520,11 +1437,11 @@ local function getAbilitiesFolder()
     return abilitiesFolder
 end
 
--- Hàm thay Animation
+-- HĂ m thay Animation
 local function replaceAnimations(animationSet)
     local abilitiesFolder = getAbilitiesFolder()
     if not abilitiesFolder then
-        warn("[⚠️] Không tìm thấy folder Abilities!")
+        warn("[â ï¸] KhĂ´ng tĂ¬m tháº¥y folder Abilities!")
         return
     end
 
@@ -1537,7 +1454,7 @@ local function replaceAnimations(animationSet)
     end
 end
 
--- Nút Anim Skill Old
+-- NĂºt Anim Skill Old
 animationTab:CreateButton({
     Name = "Anim Skill Old",
     Callback = function()
@@ -1546,7 +1463,7 @@ animationTab:CreateButton({
     end
 })
 
--- Nút Anim Skill New
+-- NĂºt Anim Skill New
 animationTab:CreateButton({
     Name = "Anim Skill New",
     Callback = function()
@@ -1555,7 +1472,7 @@ animationTab:CreateButton({
     end
 })
 
--- Respawn tự động áp dụng animation
+-- Respawn tá»± Ä‘á»™ng Ă¡p dá»¥ng animation
 LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(1)
     if animationSets[selectedAnimation] then
@@ -1571,14 +1488,14 @@ local tabOther = Window:CreateTab("Other", 4483362458)
 tabOther:CreateButton({
     Name="Change Animation V2",
     Callback=function()
-        -- Load và chạy script từ URL
+        -- Load vĂ  cháº¡y script tá»« URL
         local success, err = pcall(function()
             loadstring(game:HttpGet("https://gist.githubusercontent.com/tranvanxanh0502-afk/be6bf6dc9e3f5c2beb438418277af445/raw/d66fc9b710a26454b5eb1787f1b79bc00024ecb0/I%2520am%2520not%2520the%2520owner,%2520just%2520an%2520update"))()
         end)
         if not success then
-            warn("[Other Tab] Không thể load script: "..tostring(err))
+            warn("[Other Tab] KhĂ´ng thá»ƒ load script: "..tostring(err))
         else
-            print("[Other Tab] Script đã được load thành công!")
+            print("[Other Tab] Script Ä‘Ă£ Ä‘Æ°á»£c load thĂ nh cĂ´ng!")
         end
     end
 })
