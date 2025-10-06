@@ -1279,7 +1279,145 @@ tabGameplay:CreateToggle({
     end
 })
 
+-- ============================
+-- No M1 when Blocking (You Killer)
+-- ============================
+local noM1Enabled = false
+local DETECTION_RANGE = 18
+local CHECK_INTERVAL = 0.5
+local hideState = false
+local blockerList = {}
 
+tabGameplay:CreateToggle({
+	Name = "No M1 when Blocking (You Killer)",
+	CurrentValue = noM1Enabled,
+	Callback = function(v)
+		noM1Enabled = v
+	end
+})
+
+tabGameplay:CreateSlider({
+	Name = "Blocking Detect Range",
+	Range = {5, 30},
+	Increment = 1,
+	Suffix = " studs",
+	CurrentValue = DETECTION_RANGE,
+	Callback = function(v)
+		DETECTION_RANGE = v
+	end
+})
+
+-- Folder tham chiếu
+local survivorFolder = Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Survivor")
+local killerFolder = Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Killer")
+local PlayerGui = lp:WaitForChild("PlayerGui")
+local ABILITY_FOLDER = PlayerGui.MainGui.Abilities:WaitForChild("Folder")
+local TARGET_NAMES = { Swing = true, Cleave = true, Eject = true }
+
+-- Hàm ẩn/hiện nút
+local function hideButtons()
+	if hideState then return end
+	hideState = true
+	for _, child in ipairs(ABILITY_FOLDER:GetChildren()) do
+		if TARGET_NAMES[child.Name] and child:IsA("GuiObject") then
+			child.Visible = false
+			child.Active = false
+			if child:IsA("ImageButton") or child:IsA("TextButton") then
+				child.AutoButtonColor = false
+			end
+		end
+	end
+end
+
+local function showButtons()
+	if not hideState then return end
+	hideState = false
+	for _, child in ipairs(ABILITY_FOLDER:GetChildren()) do
+		if TARGET_NAMES[child.Name] and child:IsA("GuiObject") then
+			child.Visible = true
+			child.Active = true
+			if child:IsA("ImageButton") or child:IsA("TextButton") then
+				child.AutoButtonColor = true
+			end
+		end
+	end
+end
+
+-- Kiểm tra khoảng cách
+local function isInRange(target)
+	local char = lp.Character
+	if not (char and char:FindFirstChild("HumanoidRootPart")) then return false end
+	local root = char.HumanoidRootPart
+	local targetRoot = target:FindFirstChild("HumanoidRootPart")
+	if not targetRoot then return false end
+	return (root.Position - targetRoot.Position).Magnitude <= DETECTION_RANGE
+end
+
+-- Theo dõi trạng thái Blocking
+local function watchPlayer(playerModel)
+	if not playerModel:IsDescendantOf(survivorFolder) then return end
+	local name = playerModel.Name
+
+	local function updateBlockState()
+		local state = playerModel:GetAttribute("Blocking")
+		if state then
+			blockerList[name] = playerModel
+		else
+			blockerList[name] = nil
+		end
+	end
+
+	if playerModel:GetAttribute("Blocking") then
+		blockerList[name] = playerModel
+	end
+
+	playerModel.AttributeChanged:Connect(function(attr)
+		if attr == "Blocking" then
+			updateBlockState()
+		end
+	end)
+end
+
+-- Gắn với mọi Survivor hiện có
+for _, survivor in ipairs(survivorFolder:GetChildren()) do
+	watchPlayer(survivor)
+end
+
+-- Theo dõi người mới vào Survivor
+survivorFolder.ChildAdded:Connect(function(plr)
+	task.wait(0.1)
+	watchPlayer(plr)
+end)
+
+-- Theo dõi liên tục khi bạn là Killer
+task.spawn(function()
+	while task.wait(CHECK_INTERVAL) do
+		if not noM1Enabled then
+			showButtons()
+			continue
+		end
+
+		local isKiller = killerFolder:FindFirstChild(lp.Name)
+		if not isKiller then
+			showButtons()
+			continue
+		end
+
+		local shouldHide = false
+		for _, model in pairs(blockerList) do
+			if model and model:IsDescendantOf(survivorFolder) and isInRange(model) then
+				shouldHide = true
+				break
+			end
+		end
+
+		if shouldHide then
+			hideButtons()
+		else
+			showButtons()
+		end
+	end
+end)
 
 -- ============================
 -- Settings Tab + Instant ProximityPrompt + Unload Script
