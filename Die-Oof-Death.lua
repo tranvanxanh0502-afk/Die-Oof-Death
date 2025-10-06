@@ -4,7 +4,8 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local lp = Players.LocalPlayer
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
 connections = connections or {}
 mainConns = mainConns or {}
@@ -854,13 +855,28 @@ end)
 
 -- PART 2: Skills & Selector
 -- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part 1)
-local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local lp = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
 
-local skillList = {"Revolver","Punch","Block","Caretaker","Hotdog","Taunt","Cloak","Dash","Banana","BonusPad","Adrenaline"}
+-- Chờ LocalPlayer
+local lp = Players.LocalPlayer
+if not lp then
+    warn("Waiting for LocalPlayer...")
+    lp = Players.PlayerAdded:Wait()
+end
+
+local skillList = {"Revolver", "Punch", "Block", "Caretaker", "Hotdog", "Taunt", "Cloak", "Dash", "Banana", "BonusPad", "Adrenaline"}
 local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
+
+-- Đảm bảo Window được định nghĩa (thay bằng thư viện GUI bạn dùng)
+-- Ví dụ với Rayfield:
+local Window = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
+if not Window then
+    warn("Failed to load GUI library!")
+    return
+end
 
 -- Tab GUI
 local tabSkills = Window:CreateTab("Skills & Selector", 4483362458)
@@ -894,7 +910,21 @@ tabSkills:CreateDropdown({
 tabSkills:CreateButton({
     Name = "Select Skills",
     Callback = function()
-        local abilitySelection = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteEvents"):WaitForChild("AbilitySelection")
+        local events = ReplicatedStorage:WaitForChild("Events", 5)
+        if not events then
+            warn("Events folder not found in ReplicatedStorage!")
+            return
+        end
+        local remoteEvents = events:WaitForChild("RemoteEvents", 5)
+        if not remoteEvents then
+            warn("RemoteEvents folder not found!")
+            return
+        end
+        local abilitySelection = remoteEvents:WaitForChild("AbilitySelection", 5)
+        if not abilitySelection then
+            warn("AbilitySelection RemoteEvent not found!")
+            return
+        end
         abilitySelection:FireServer({selectedSkill1, selectedSkill2})
     end
 })
