@@ -867,23 +867,26 @@ if not lp then
     lp = Players.PlayerAdded:Wait()
 end
 
-local skillList = {"Revolver", "Punch", "Block", "Caretaker", "Hotdog", "Taunt", "Cloak", "Dash", "Banana", "BonusPad", "Adrenaline"}
-local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
-
--- Đảm bảo Window được định nghĩa (thay bằng thư viện GUI bạn dùng)
--- Ví dụ với Rayfield:
-local Window = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
-if not Window then
-    warn("Failed to load GUI library!")
+-- Kiểm tra Window trước khi dùng
+if not Window or not Window.CreateTab then
+    warn("Window is not properly initialized! Check GUI main script.")
     return
 end
 
+local skillList = {"Revolver", "Punch", "Block", "Caretaker", "Hotdog", "Taunt", "Cloak", "Dash", "Banana", "BonusPad", "Adrenaline"}
+local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
+
 -- Tab GUI
 local tabSkills = Window:CreateTab("Skills & Selector", 4483362458)
+if not tabSkills then
+    warn("Failed to create tab! Check Window functionality.")
+    return
+end
 local skillParagraph = tabSkills:CreateParagraph({
     Title = "Selected Skills",
     Content = "Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2
 })
+
 
 -- Dropdowns
 tabSkills:CreateDropdown({
