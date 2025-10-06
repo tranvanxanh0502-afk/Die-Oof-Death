@@ -1084,16 +1084,11 @@ tabGameplay:CreateToggle({
 -- ============================
 -- 🧩 Custom MaxStamina System (Tối ưu - 5 giây kiểm tra 1 lần)
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local lp = Players.LocalPlayer
-
 local keepStaminaEnabled = true
 local customStamina = 100
+lp.CharacterAdded:Wait()
 local defaultStamina = ((lp.Character or lp.CharacterAdded:Wait()):GetAttribute("MaxStamina")) or 100
-local unloaded = false
-local lockWSM = false -- nếu bạn có hệ lock WalkSpeedModifier
-local mainConns = {}
+
 
 -- ⚙️ Tab GUI (giả định bạn có tabGameplay)
 tabGameplay:CreateToggle({
