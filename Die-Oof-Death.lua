@@ -1217,6 +1217,8 @@ end)
 getgenv().ImplementEnabled=false
 local canTrigger=true
 
+-- Cập nhật KillerFolder khi cấu trúc Workspace thay đổi
+updateKillerFolder()
 local function getKillerFolder()
     local ga = Workspace:FindFirstChild("GameAssets")
     if not ga then return nil end
