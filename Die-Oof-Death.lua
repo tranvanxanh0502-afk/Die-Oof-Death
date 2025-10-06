@@ -1148,28 +1148,17 @@ mainConns.staminaHB = RunService.Heartbeat:Connect(function()
     if not hum then return end
 
     if lockWSM then
-        for _, obj in pairs({hum,char,lp}) do
-            if obj and obj.GetAttributes then
-                local attrs = obj:GetAttributes()
-                if attrs then
-                    for name,val in pairs(attrs) do
-                        if typeof(name)=="string" and name:lower():find("walkspeedmodifier") then
-                            if val<=0 then obj:SetAttribute(name,0) end
-                        end
-                    end
-                end
-            end
+        -- Nhắm trực tiếp đến thuộc tính cụ thể
+        local wsm = char:GetAttribute("WalkSpeedModifier")
+        if wsm and wsm <= 0 then
+            char:SetAttribute("WalkSpeedModifier", 0)
         end
     end
 
-    if keepStaminaEnabled and char then
-        if char:GetAttribute("MaxStamina")~=customStamina then
-            char:SetAttribute("MaxStamina",customStamina)
-        end
-    elseif char then
-        if char:GetAttribute("MaxStamina")~=defaultStamina then
-            char:SetAttribute("MaxStamina",defaultStamina)
-        end
+    if keepStaminaEnabled and char:GetAttribute("MaxStamina") ~= customStamina then
+        char:SetAttribute("MaxStamina", customStamina)
+    elseif char and char:GetAttribute("MaxStamina") ~= defaultStamina then
+        char:SetAttribute("MaxStamina", defaultStamina)
     end
 end)
 
@@ -1237,30 +1226,30 @@ end)
 -- ============================
 -- Implement Fast Artful
 -- ============================
-getgenv().ImplementEnabled=false
-local canTrigger=true
+getgenv().ImplementEnabled = false
+local canTrigger = true
+local killerFolder = nil
 
-local function getKillerFolder()
+-- Hàm cập nhật KillerFolder
+local function updateKillerFolder()
     local ga = Workspace:FindFirstChild("GameAssets")
-    if not ga then return nil end
-    local teams = ga:FindFirstChild("Teams")
-    if not teams then return nil end
-    return teams:FindFirstChild("Killer")
+    local teams = ga and ga:FindFirstChild("Teams")
+    killerFolder = teams and teams:FindFirstChild("Killer")
 end
 
+-- Hàm kiểm tra nhân vật có phải là Killer
 local function HoldImpl_isKiller()
-    local kf = getKillerFolder()
-    if not kf then return false end
-    return kf:FindFirstChild(lp.Name)~=nil
+    return killerFolder and killerFolder:FindFirstChild(lp.Name) ~= nil
 end
 
-local function HoldImpl_holdInAir(duration,offsetY)
+-- Hàm giữ nhân vật trên không
+local function HoldImpl_holdInAir(duration, offsetY)
     local char = lp.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp or not hrp.Parent then return end
     local bp = Instance.new("BodyPosition")
-    bp.Position = hrp.Position + Vector3.new(0,offsetY,0)
-    bp.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
+    bp.Position = hrp.Position + Vector3.new(0, offsetY, 0)
+    bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bp.P = 100000
     bp.D = 1000
     bp.Parent = hrp
@@ -1270,33 +1259,78 @@ local function HoldImpl_holdInAir(duration,offsetY)
     end)
 end
 
-local function HoldImpl_CheckAttributes()
+-- Cập nhật KillerFolder khi cấu trúc Workspace thay đổi
+updateKillerFolder()
+Workspace.ChildAdded:Connect(updateKillerFolder)
+Workspace.ChildRemoved:Connect(updateKillerFolder)
+if Workspace:FindFirstChild("GameAssets") then
+    Workspace.GameAssets.ChildAdded:Connect(updateKillerFolder)
+    Workspace.GameAssets.ChildRemoved:Connect(updateKillerFolder)
+end
+
+-- Theo dõi thay đổi thuộc tính
+mainConns.implementHB = lp:GetAttributeChangedSignal("KillerName"):Connect(function()
     if not getgenv().ImplementEnabled then return end
     local char = lp.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not char or not hrp then return end
-    if not HoldImpl_isKiller() then return end
+    if not char or not hrp or not HoldImpl_isKiller() then return end
 
     local killerName = char:GetAttribute("KillerName")
     local implementCooldown = char:GetAttribute("ImplementCooldown")
 
-    if killerName=="Artful" and canTrigger and (implementCooldown==true or (type(implementCooldown)=="number" and implementCooldown>0)) then
-        HoldImpl_holdInAir(2,2.5)
-        canTrigger=false
+    if killerName == "Artful" and canTrigger and (implementCooldown == true or (type(implementCooldown) == "number" and implementCooldown > 0)) then
+        HoldImpl_holdInAir(2, 2.5)
+        canTrigger = false
     end
 
-    if implementCooldown==false or implementCooldown==0 then canTrigger=true end
-end
+    if implementCooldown == false or implementCooldown == 0 then
+        canTrigger = true
+    end
+end)
 
-mainConns.implementHB = RunService.Heartbeat:Connect(HoldImpl_CheckAttributes)
-lp.CharacterAdded:Connect(function() canTrigger=true end)
+mainConns.implementCooldown = lp:GetAttributeChangedSignal("ImplementCooldown"):Connect(function()
+    if not getgenv().ImplementEnabled then return end
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not char or not hrp or not HoldImpl_isKiller() then return end
 
+    local killerName = char:GetAttribute("KillerName")
+    local implementCooldown = char:GetAttribute("ImplementCooldown")
+
+    if killerName == "Artful" and canTrigger and (implementCooldown == true or (type(implementCooldown) == "number" and implementCooldown > 0)) then
+        HoldImpl_holdInAir(2, 2.5)
+        canTrigger = false
+    end
+
+    if implementCooldown == false or implementCooldown == 0 then
+        canTrigger = true
+    end
+end)
+
+-- Reset canTrigger khi nhân vật respawn
+lp.CharacterAdded:Connect(function()
+    canTrigger = true
+end)
+
+-- Toggle cho Implement Fast Artful
 tabGameplay:CreateToggle({
-    Name="Implement Fast Artful",
-    CurrentValue=getgenv().ImplementEnabled,
-    Callback=function(v)
-        getgenv().ImplementEnabled=v
-        if v then HoldImpl_CheckAttributes() end
+    Name = "Implement Fast Artful",
+    CurrentValue = getgenv().ImplementEnabled,
+    Callback = function(v)
+        getgenv().ImplementEnabled = v
+        if v then
+            -- Kiểm tra ngay lập tức khi bật toggle
+            local char = lp.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if char and hrp and HoldImpl_isKiller() then
+                local killerName = char:GetAttribute("KillerName")
+                local implementCooldown = char:GetAttribute("ImplementCooldown")
+                if killerName == "Artful" and canTrigger and (implementCooldown == true or (type(implementCooldown) == "number" and implementCooldown > 0)) then
+                    HoldImpl_holdInAir(2, 2.5)
+                    canTrigger = false
+                end
+            end
+        end
     end
 })
 
@@ -1304,30 +1338,65 @@ tabGameplay:CreateToggle({
 -- Settings Tab + Instant ProximityPrompt + Unload Script
 -- ============================
 local tabSettings = Window:CreateTab("Settings",4483362458)
-local instantPPEnabled=true
+local instantPPEnabled = true
+local proximityPrompts = {} -- Lưu trữ danh sách các ProximityPrompt
 
-tabSettings:CreateToggle({
-    Name="Instant ProximityPrompt",
-    CurrentValue=instantPPEnabled,
-    Callback=function(v)
-        instantPPEnabled=v
-        for _,p in ipairs(Workspace:GetDescendants()) do
-            if p:IsA("ProximityPrompt") then
-                if instantPPEnabled then p.HoldDuration=0
-                else p.HoldDuration=p:GetAttribute("OriginalHoldDuration") or 1 end
+-- Hàm cập nhật HoldDuration cho tất cả ProximityPrompt
+local function updateProximityPrompts()
+    for prompt, _ in pairs(proximityPrompts) do
+        if prompt and prompt:IsA("ProximityPrompt") then
+            if instantPPEnabled then
+                prompt.HoldDuration = 0
+            else
+                prompt.HoldDuration = prompt:GetAttribute("OriginalHoldDuration") or 1
             end
         end
     end
-})
+end
 
-mainConns.workspaceDescendant = Workspace.DescendantAdded:Connect(function(obj)
-    if obj:IsA("ProximityPrompt") then
-        if obj:GetAttribute("OriginalHoldDuration")==nil then
-            obj:SetAttribute("OriginalHoldDuration",obj.HoldDuration)
+-- Hàm xử lý ProximityPrompt mới
+local function handleProximityPrompt(prompt)
+    if prompt:IsA("ProximityPrompt") then
+        if prompt:GetAttribute("OriginalHoldDuration") == nil then
+            prompt:SetAttribute("OriginalHoldDuration", prompt.HoldDuration)
         end
-        if instantPPEnabled then obj.HoldDuration=0 end
+        proximityPrompts[prompt] = true -- Thêm vào danh sách
+        if instantPPEnabled then
+            prompt.HoldDuration = 0
+        end
+        -- Kết nối sự kiện AncestryChanged để dọn dẹp
+        prompt.AncestryChanged:Connect(function()
+            if not prompt:IsDescendantOf(Workspace) then
+                proximityPrompts[prompt] = nil
+            end
+        end)
     end
-end)
+end
+
+-- Khởi tạo: Tìm tất cả ProximityPrompt trong Workspace.GameAssets.Teams.Other
+local otherFolder = Workspace:WaitForChild("GameAssets", 5)
+    and Workspace.GameAssets:WaitForChild("Teams", 5)
+    and Workspace.GameAssets.Teams:WaitForChild("Other", 5)
+
+if otherFolder then
+    for _, obj in pairs(otherFolder:GetDescendants()) do
+        handleProximityPrompt(obj)
+    end
+    -- Theo dõi các ProximityPrompt mới trong Other
+    mainConns.workspaceDescendant = otherFolder.DescendantAdded:Connect(handleProximityPrompt)
+else
+    warn("[InstantPP] Không tìm thấy Workspace.GameAssets.Teams.Other, không giám sát ProximityPrompt")
+end
+
+-- Toggle cho Instant ProximityPrompt
+tabSettings:CreateToggle({
+    Name = "Instant ProximityPrompt",
+    CurrentValue = instantPPEnabled,
+    Callback = function(v)
+        instantPPEnabled = v
+        updateProximityPrompts() -- Cập nhật tất cả ProximityPrompt hiện có
+    end
+})
 
 tabSettings:CreateButton({
     Name="Unload Script",
