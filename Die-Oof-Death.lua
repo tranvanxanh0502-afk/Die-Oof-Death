@@ -1053,7 +1053,6 @@ for _, skillName in ipairs(skillList) do
     })
 end
 -- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI + AntiAnim + Other Tab)
-
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -1082,21 +1081,16 @@ tabGameplay:CreateToggle({
 -- ============================
 -- Stamina Controls
 -- ============================
--- 🧩 Custom MaxStamina System (Tối ưu - 5 giây kiểm tra 1 lần)
-
 local keepStaminaEnabled = true
 local customStamina = 100
-lp.CharacterAdded:Wait()
 local defaultStamina = ((lp.Character or lp.CharacterAdded:Wait()):GetAttribute("MaxStamina")) or 100
 
-
--- ⚙️ Tab GUI (giả định bạn có tabGameplay)
 tabGameplay:CreateToggle({
-    Name = "Enable Custom MaxStamina",
-    CurrentValue = keepStaminaEnabled,
-    Callback = function(v)
-        keepStaminaEnabled = v
-        local ch = lp.Character
+    Name="Enable Custom MaxStamina",
+    CurrentValue=keepStaminaEnabled,
+    Callback=function(v)
+        keepStaminaEnabled=v
+        local ch=lp.Character
         if ch then
             ch:SetAttribute("MaxStamina", v and customStamina or defaultStamina)
         end
@@ -1104,73 +1098,76 @@ tabGameplay:CreateToggle({
 })
 
 tabGameplay:CreateInput({
-    Name = "Custom MaxStamina (0-999999)",
-    PlaceholderText = "Nhập số...",
-    RemoveTextAfterFocusLost = true,
-    Callback = function(text)
+    Name="Custom MaxStamina (0-999999)",
+    PlaceholderText="Nháº­p sá»‘...",
+    RemoveTextAfterFocusLost=true,
+    Callback=function(text)
         local num = tonumber(text)
-        if num and num >= 0 and num <= 999999 then
-            customStamina = num
+        if num and num>=0 and num<=999999 then
+            customStamina=num
             if keepStaminaEnabled and lp.Character then
-                lp.Character:SetAttribute("MaxStamina", customStamina)
+                lp.Character:SetAttribute("MaxStamina",customStamina)
             end
         else
-            warn("Giá trị không hợp lệ (0-999999)")
+            warn("GiĂ¡ trá»‹ khĂ´ng há»£p lá»‡ (0-999999)")
         end
     end
 })
 
--- Kiểm tra định kỳ 5 giây/lần thay vì mỗi frame
-task.spawn(function()
-    while task.wait(5) do
-        if unloaded then break end
+-- Heartbeat loop WalkSpeed/Stamina
+mainConns.staminaHB = RunService.Heartbeat:Connect(function()
+    if unloaded then return end
+    local char = lp.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
 
-        local char = lp.Character
-        if not char then continue end
-
-        local current = char:GetAttribute("MaxStamina")
-
-        if keepStaminaEnabled then
-            if current ~= customStamina then
-                char:SetAttribute("MaxStamina", customStamina)
-            end
-        else
-            if current ~= defaultStamina then
-                char:SetAttribute("MaxStamina", defaultStamina)
+    if lockWSM then
+        for _, obj in pairs({hum,char,lp}) do
+            if obj and obj.GetAttributes then
+                local attrs = obj:GetAttributes()
+                if attrs then
+                    for name,val in pairs(attrs) do
+                        if typeof(name)=="string" and name:lower():find("walkspeedmodifier") then
+                            if val<=0 then obj:SetAttribute(name,0) end
+                        end
+                    end
+                end
             end
         end
+    end
 
-        if lockWSM then
-            local wsm = char:GetAttribute("WalkSpeedModifier")
-            if wsm and wsm < 0 then
-                char:SetAttribute("WalkSpeedModifier", 0)
-            end
+    if keepStaminaEnabled and char then
+        if char:GetAttribute("MaxStamina")~=customStamina then
+            char:SetAttribute("MaxStamina",customStamina)
+        end
+    elseif char then
+        if char:GetAttribute("MaxStamina")~=defaultStamina then
+            char:SetAttribute("MaxStamina",defaultStamina)
         end
     end
 end)
 
--- 🔁 Khi nhân vật respawn, tự gán lại stamina
+-- CharacterAdded WalkSpeed/Stamina
 mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
     local hum = char:WaitForChild("Humanoid", 10)
     if not hum then return end
 
-    task.defer(function()
-        if keepStaminaEnabled then
-            char:SetAttribute("MaxStamina", customStamina)
-        else
-            char:SetAttribute("MaxStamina", defaultStamina)
-        end
-    end)
+    if keepStaminaEnabled then char:SetAttribute("MaxStamina",customStamina)
+    else char:SetAttribute("MaxStamina",defaultStamina) end
 
     if lockWSM then
-        task.defer(function()
-            local attrs = char:GetAttributes()
-            for name, val in pairs(attrs) do
-                if typeof(name) == "string" and name:lower():find("walkspeedmodifier") then
-                    if val <= 0 then char:SetAttribute(name, 0) end
+        for _, obj in pairs({hum,char,lp}) do
+            if obj and obj.GetAttributes then
+                local attrs = obj:GetAttributes()
+                if attrs then
+                    for name,val in pairs(attrs) do
+                        if typeof(name)=="string" and name:lower():find("walkspeedmodifier") then
+                            if val<=0 then obj:SetAttribute(name,0) end
+                        end
+                    end
                 end
             end
-        end)
+        end
     end
 end)
 
@@ -1194,7 +1191,7 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(0.2)
+        task.wait(0.5)
         if AntiWalls and Workspace:FindFirstChild("GameAssets") then
             local teams = Workspace.GameAssets:FindFirstChild("Teams")
             if teams and teams:FindFirstChild("Other") then
@@ -1217,8 +1214,6 @@ end)
 getgenv().ImplementEnabled=false
 local canTrigger=true
 
--- Cập nhật KillerFolder khi cấu trúc Workspace thay đổi
-updateKillerFolder()
 local function getKillerFolder()
     local ga = Workspace:FindFirstChild("GameAssets")
     if not ga then return nil end
@@ -1267,7 +1262,12 @@ local function HoldImpl_CheckAttributes()
     if implementCooldown==false or implementCooldown==0 then canTrigger=true end
 end
 
-mainConns.implementHB = RunService.Heartbeat:Connect(HoldImpl_CheckAttributes)
+task.spawn(function()
+    while task.wait(1) do  -- chỉnh 0.5 thành 1 để nhẹ hơn
+        HoldImpl_CheckAttributes()
+        if unloaded then break end
+    end
+end)
 lp.CharacterAdded:Connect(function() canTrigger=true end)
 
 tabGameplay:CreateToggle({
@@ -1278,80 +1278,8 @@ tabGameplay:CreateToggle({
         if v then HoldImpl_CheckAttributes() end
     end
 })
--- Cập nhật KillerFolder khi cấu trúc Workspace thay đổi
-updateKillerFolder()
-Workspace.ChildAdded:Connect(updateKillerFolder)
-Workspace.ChildRemoved:Connect(updateKillerFolder)
-if Workspace:FindFirstChild("GameAssets") then
-    Workspace.GameAssets.ChildAdded:Connect(updateKillerFolder)
-    Workspace.GameAssets.ChildRemoved:Connect(updateKillerFolder)
-end
 
--- Theo dõi thay đổi thuộc tính
-mainConns.implementHB = lp:GetAttributeChangedSignal("KillerName"):Connect(function()
-    if not getgenv().ImplementEnabled then return end
-    local char = lp.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not char or not hrp or not HoldImpl_isKiller() then return end
 
-    local killerName = char:GetAttribute("KillerName")
-    local implementCooldown = char:GetAttribute("ImplementCooldown")
-
-    if killerName == "Artful" and canTrigger and (implementCooldown == true or (type(implementCooldown) == "number" and implementCooldown > 0)) then
-        HoldImpl_holdInAir(2, 2.5)
-        canTrigger = false
-    end
-
-    if implementCooldown == false or implementCooldown == 0 then
-        canTrigger = true
-    end
-end)
-
-mainConns.implementCooldown = lp:GetAttributeChangedSignal("ImplementCooldown"):Connect(function()
-    if not getgenv().ImplementEnabled then return end
-    local char = lp.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not char or not hrp or not HoldImpl_isKiller() then return end
-
-    local killerName = char:GetAttribute("KillerName")
-    local implementCooldown = char:GetAttribute("ImplementCooldown")
-
-    if killerName == "Artful" and canTrigger and (implementCooldown == true or (type(implementCooldown) == "number" and implementCooldown > 0)) then
-        HoldImpl_holdInAir(2, 2.5)
-        canTrigger = false
-    end
-
-    if implementCooldown == false or implementCooldown == 0 then
-        canTrigger = true
-    end
-end)
-
--- Reset canTrigger khi nhân vật respawn
-lp.CharacterAdded:Connect(function()
-    canTrigger = true
-end)
-
--- Toggle cho Implement Fast Artful
-tabGameplay:CreateToggle({
-    Name = "Implement Fast Artful",
-    CurrentValue = getgenv().ImplementEnabled,
-    Callback = function(v)
-        getgenv().ImplementEnabled = v
-        if v then
-            -- Kiểm tra ngay lập tức khi bật toggle
-            local char = lp.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if char and hrp and HoldImpl_isKiller() then
-                local killerName = char:GetAttribute("KillerName")
-                local implementCooldown = char:GetAttribute("ImplementCooldown")
-                if killerName == "Artful" and canTrigger and (implementCooldown == true or (type(implementCooldown) == "number" and implementCooldown > 0)) then
-                    HoldImpl_holdInAir(2, 2.5)
-                    canTrigger = false
-                end
-            end
-        end
-    end
-})
 
 -- ============================
 -- Settings Tab + Instant ProximityPrompt + Unload Script
