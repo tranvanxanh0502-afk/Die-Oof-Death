@@ -53,8 +53,7 @@ local Window = Rayfield:CreateWindow({
     Name = "HUB (Die of Death)TY @maxiedsu/gonnered bbbbb_090909-VN",
     LoadingTitle = "Loading...TY @maxiedsu/gonnered",
     LoadingSubtitle = "by cutotoite_10",
-    ConfigurationSaving = {Enabled = false},
-    Icon = "rbxassetid://115233777642994"
+    ConfigurationSaving = {Enabled = false}
 })
 
 -- ========== ESP ==========
