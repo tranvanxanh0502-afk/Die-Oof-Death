@@ -1,5 +1,4 @@
 --  PART 1: Load Rayfield + ESP + Speed Settings + Auto Block
-local _ = string.char(98,121,32)..string.char(54,100,97)..string.char(121,49,51)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
@@ -1639,8 +1638,6 @@ end)
 -- Other Tab (Loadstring)
 -- ============================
 -- Fix êrror Http403,hey what are you doing...Diova
--- By © 6day13
-local _ = string.char(87,65,82,78,73,78,71,58,32,68,79,32,78,79,84,32,69,68,73,84,10,79,119,110,101,114,58,32,54,100,97,121,49,51)
 local tabOther = Window:CreateTab("Other", 4483362458)
 
 tabOther:CreateButton({
