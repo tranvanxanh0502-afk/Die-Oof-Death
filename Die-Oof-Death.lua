@@ -1,10 +1,10 @@
 --  PART 1: Load Rayfield + ESP + Speed Settings + Auto Block
+local _ = string.char(98,121,32)..string.char(54,100,97)..string.char(121,49,51)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
 local lp = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
 connections = connections or {}
