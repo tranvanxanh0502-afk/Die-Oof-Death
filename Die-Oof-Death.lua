@@ -51,7 +51,7 @@ do
 end
 
 local Window = Rayfield:CreateWindow({
-    Name = "HUB (Die of Death)TY @maxiedsu/gonnered bbbbb_090909-VN",
+    Name = "HUB (D OF D)TY @maxiedsu/gonnered GodroycenosG20-EN",
     LoadingTitle = "Loading...TY @maxiedsu/gonnered",
     LoadingSubtitle = "by cutotoite_10",
     ConfigurationSaving = {Enabled = false}
