@@ -1638,19 +1638,31 @@ end)
 -- Other Tab (Loadstring)
 -- ============================
 -- Fix êrror Http403,hey what are you doing...Diova
-local tabOther = Window:CreateTab("Other", 4483362458)
-
+local _ = string.char(87,65,82,78,73,78,71,58,32,68,79,32,78,79,84,32,69,68,73,84,10,79,119,110,101,114,58,32,54,100,97,121,49,51)
 tabOther:CreateButton({
-    Name="Change Animation V2",
-    Callback=function()
-        -- Load vĂ  cháº¡y script tá»« URL
+    Name = "Change Animation V2",
+    Callback = function()
         local success, err = pcall(function()
-            loadstring(game:HttpGet("https://gist.githubusercontent.com/tranvanxanh0502-afk/be6bf6dc9e3f5c2beb438418277af445/raw/d66fc9b710a26454b5eb1787f1b79bc00024ecb0/I%2520am%2520not%2520the%2520owner,%2520just%2520an%2520update"))()
+            loadstring(game:HttpGet("https://gist.githubusercontent.com/tranvanxanh0502-afk/be6bf6dc9e3f5c2beb438418277af445/raw/d66fc9b710a26454b5eb1787f1b79bc00024ecb0/I%2520am%2520not%2520the%2520owner,%2520just%2520an%2520update", true))()
         end)
         if not success then
-            warn("[Other Tab] KhĂ´ng thá»ƒ load script: "..tostring(err))
+            warn("[Other Tab] Không thể load script: "..tostring(err))
         else
-            print("[Other Tab] Script Ä‘Ă£ Ä‘Æ°á»£c load thĂ nh cĂ´ng!")
+            print("[Other Tab] Script đã được load thành công!")
+        end
+    end
+})
+
+tabOther:CreateButton({
+    Name = "Load Flip Script",
+    Callback = function()
+        local success, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/SHRTRYScriptMANhere/stolenahhfrotflip/refs/heads/main/Flip", true))()
+        end)
+        if not success then
+            warn("[Other Tab] Không thể load Flip script: "..tostring(err))
+        else
+            print("[Other Tab] Flip script đã được load thành công!")
         end
     end
 })
