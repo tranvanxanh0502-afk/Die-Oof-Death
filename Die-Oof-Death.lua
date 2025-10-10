@@ -219,7 +219,7 @@ local function updateAllESP()
 end
 
 for teamName, cfg in pairs(espConfigs) do
-    local tab = Window:CreateTab(teamName.." ESP", 112782238340616)
+    local tab = Window:CreateTab(teamName.." ESP", 4483362458)
     tab:CreateToggle({
         Name="Enable ESP", 
         CurrentValue=cfg.Enabled, 
@@ -1422,7 +1422,7 @@ end)
 -- ============================
 -- Settings Tab + Instant ProximityPrompt + Unload Script
 -- ============================
-local tabSettings = Window:CreateTab("Settings",115818080186863)
+local tabSettings = Window:CreateTab("Settings",4483362458)
 local instantPPEnabled = true
 local proximityPrompts = {} -- Lưu trữ danh sách các ProximityPrompt
 
