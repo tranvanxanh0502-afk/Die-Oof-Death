@@ -1517,7 +1517,7 @@ tabSettings:CreateButton({
 -- ============================
 -- Tab Animation (Change Animation)
 -- ============================
-local animationTab = Window:CreateTab("Animation", 89601146180442)
+local animationTab = Window:CreateTab("Animation", 4483362458)
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
