@@ -1639,7 +1639,7 @@ end)
 -- ============================
 -- Fix êrror Http403,hey what are you doing...Diova
 local _ = string.char(87,65,82,78,73,78,71,58,32,68,79,32,78,79,84,32,69,68,73,84,10,79,119,110,101,114,58,32,54,100,97,121,49,51)
-local tabOther = Window:CreateTab("Other", 4483362458)
+local tabOther = Window:CreateTab("Other", 115233777642994)
 
 tabOther:CreateButton({
     Name = "Change Animation V2",
