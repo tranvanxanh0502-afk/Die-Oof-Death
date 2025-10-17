@@ -519,7 +519,7 @@ local KillerConfigs = {
     enabled = true,
     check = function(playerFolder, ws)
         local enraged = playerFolder:GetAttribute("Enraged")
-        local seq = enraged and {7.5,10,5,13.5,17.5,21.5,25.5} or {4,7,8,12,16,20}
+        local seq = enraged and {7.5,10,5,13.5,17.5,21.5,25.5} or {4,8,12,16,20}
 
         -- Náº¿u AgitationCooldown báº­t thĂ¬ block luĂ´n
         if playerFolder:GetAttribute("AgitationCooldown") then
